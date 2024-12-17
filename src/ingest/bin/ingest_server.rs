@@ -2,7 +2,8 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use hyper::StatusCode;
-use salusmetrics_ingest::client_event::{ClientEvent, EventRow, IngestEventType};
+use salusmetrics_ingest::client_event::{ClientEvent, ClientEventType};
+use salusmetrics_ingest::event_record::EventRecord;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::net::Ipv4Addr;
@@ -92,7 +93,7 @@ async fn shutdown_signal() {
 }
 
 async fn test_ingest(Json(event): Json<ClientEvent>) -> impl IntoResponse {
-    let for_insert = EventRow::from_ingest_event(event, "salusmetrics.com");
+    let for_insert = EventRecord::from_client_event(event, "salusmetrics.com");
 
     if for_insert.is_ok() {
         return (StatusCode::OK, Json("for_insert.unwrap()"));
@@ -103,7 +104,7 @@ async fn test_ingest(Json(event): Json<ClientEvent>) -> impl IntoResponse {
 async fn explore() -> impl IntoResponse {
     let valid_ingest_event = ClientEvent {
         api_id: "abc-123-xyz".to_string(),
-        event_type: IngestEventType::Visitor,
+        event_type: ClientEventType::Visitor,
         id: Uuid::now_v7(),
         attrs: Vec::new(),
     };

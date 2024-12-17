@@ -1,8 +1,9 @@
 [package]
 name = "salusmetrics-ingest"
 description = "Ingest Component of salusmetrics, a web and app analytics package that allows for ingestion, aggregation and reporting on web ann app analytics"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
 
 [dependencies]
 axum.workspace = true
