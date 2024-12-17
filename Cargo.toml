@@ -1,0 +1,34 @@
+# name = "salusmetrics"
+# description = "A web and app analytics package that allows for ingestion, aggregation and reporting on web ann app analytics"
+[workspace]
+members = ["src/ingest"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0"
+
+[workspace.dependencies]
+axum = "0.7.9"
+clickhouse = { version = "0.13.1", features = ["time", "uuid"] }
+hyper = "1.5.2"
+serde = { version = "1.0.216", features = ["derive"] }
+serde_repr = "0.1.19"
+thiserror = "2.0.7"
+time = "0.3.37"
+tokio = { version = "1.42.0", features = [
+    "rt-multi-thread",
+    "signal",
+    "tracing",
+] }
+tower = "0.5.2"
+tower-http = { version = "0.6.2", features = [
+    "compression-deflate",
+    "compression-gzip",
+    "timeout",
+    "trace",
+] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
+uuid = { version = "1.11.0", features = ["v7"] }
