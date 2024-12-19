@@ -1,16 +1,16 @@
+use crate::client_event::{ClientEvent, ClientEventType};
 use clickhouse::Row;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use thiserror::Error;
 use time::{Duration, OffsetDateTime};
+use tracing::instrument;
 use uuid::Uuid;
 
 /// Earliest event the system treats as valid for ingestion relative to now
 pub const MAX_DURATION_BEFORE_PRESENT: Duration = Duration::HOUR;
 /// Latest event the system treats as valid for ingestion relative to now
 pub const MAX_DURATION_AFTER_PRESENT: Duration = Duration::minutes(5);
-
-use crate::client_event::{ClientEvent, ClientEventType};
 
 /// Type of analytics event - maps to ClickHouse Enum8 with identical values
 #[derive(Debug, Deserialize_repr, PartialEq, Eq, PartialOrd, Ord, Serialize_repr, Clone)]
@@ -22,14 +22,19 @@ pub enum EventRecordType {
     Click = 5,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ApiKey(pub String);
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Site(pub String);
+
 /// Represents the data that will actually be inserted into ClickHouse in the
 /// SALUS_METRICS.EVENT table. Expected usages is to call
 /// InsertIngestEvent::from_ingest_event on a IngestEvent that has been
 /// received.
 #[derive(Debug, Row, Deserialize, Serialize, Clone)]
 pub struct EventRecord {
-    api_id: String,
-    site: String,
+    api_key: ApiKey,
+    site: Site,
     event_type: EventRecordType,
     #[serde(with = "clickhouse::serde::uuid")]
     id: Uuid,
@@ -68,16 +73,23 @@ impl EventRecord {
     /// This will error in cases where the UUID is not of type v7 and also if
     /// the time for the event derived from the UUID is not within the bounds
     /// of now - MAX_DURATION_BEFORE_PRESENT and now + MAX_DURATION_BEFORE_PRESENT
-    #[tracing::instrument]
-    pub fn from_client_event(value: ClientEvent, site: &str) -> Result<Self, IngestRecordError> {
+    #[instrument]
+    pub fn try_from_client_event(
+        value: ClientEvent,
+        api_key: ApiKey,
+        site: Site,
+    ) -> Result<Self, IngestRecordError> {
         // Determine if the UUID is a proper v7 and if the date is close to now
-        let uuid_datetime = Self::verify_datetime_range(try_uuid_datetime(&value.id)?)?;
+
+        let uuid_datetime = try_uuid_datetime(&value.id)
+            .inspect_err(|e| tracing::warn!("error converting UUID to datetime: {e}"))?;
+        let verified_datetime = Self::verify_datetime_range(uuid_datetime)?;
         Ok(EventRecord {
-            api_id: value.api_id,
-            site: site.to_string(),
+            api_key,
+            site,
             event_type: value.event_type.into(),
             id: value.id,
-            ts: uuid_datetime,
+            ts: verified_datetime,
             attrs: value.attrs,
         })
     }
@@ -88,6 +100,7 @@ impl EventRecord {
     /// All events must be no earlier than now - MAX_BEFORE_PRESENT and no later
     /// than now + MAX_AFTER_PRESENT. Any value outside of this range will result
     /// in a TimestampOutOfRange error
+    #[instrument]
     fn verify_datetime_range(
         datetime: OffsetDateTime,
     ) -> Result<OffsetDateTime, IngestRecordError> {
@@ -95,6 +108,7 @@ impl EventRecord {
         if (datetime < (now - MAX_DURATION_BEFORE_PRESENT))
             || (datetime > (now + MAX_DURATION_AFTER_PRESENT))
         {
+            tracing::warn!("Time out of range from UUID");
             Err(IngestRecordError::TimestampOutOfRange)
         } else {
             Ok(datetime)
@@ -109,6 +123,7 @@ impl EventRecord {
 /// Additionally, the difference in handling of UNIX timestamps can cause
 /// errors if the u64 cannot be properly converted to i64 or if the value
 /// is out of the component range of the OffsetDateTime crate.
+#[instrument]
 fn try_uuid_datetime(uuid: &Uuid) -> Result<OffsetDateTime, IngestRecordError> {
     let (sec, _) = uuid
         .get_timestamp()
@@ -170,11 +185,10 @@ mod tests {
     }
 
     #[test]
-    fn test_from_client_event() {
+    fn test_try_from_client_event() {
         let uuid_now = Uuid::now_v7();
         let (ts_now, _) = uuid_now.get_timestamp().unwrap().to_unix();
         let valid_ingest_event = ClientEvent {
-            api_id: API_KEY_STR.to_string(),
             event_type: ClientEventType::Visitor,
             id: uuid_now,
             attrs: Vec::new(),
@@ -195,17 +209,37 @@ mod tests {
             ..valid_ingest_event.clone()
         };
 
-        EventRecord::from_client_event(valid_ingest_event, SITE).unwrap();
+        EventRecord::try_from_client_event(
+            valid_ingest_event,
+            ApiKey(API_KEY_STR.to_string()),
+            Site(SITE.to_string()),
+        )
+        .unwrap();
         assert_eq!(
-            EventRecord::from_client_event(invalid_ingest_event_type, SITE).unwrap_err(),
+            EventRecord::try_from_client_event(
+                invalid_ingest_event_type,
+                ApiKey(API_KEY_STR.to_string()),
+                Site(SITE.to_string()),
+            )
+            .unwrap_err(),
             IngestRecordError::UuidVersion
         );
         assert_eq!(
-            EventRecord::from_client_event(invalid_ingest_event_early, SITE).unwrap_err(),
+            EventRecord::try_from_client_event(
+                invalid_ingest_event_early,
+                ApiKey(API_KEY_STR.to_string()),
+                Site(SITE.to_string()),
+            )
+            .unwrap_err(),
             IngestRecordError::TimestampOutOfRange
         );
         assert_eq!(
-            EventRecord::from_client_event(invalid_ingest_event_late, SITE).unwrap_err(),
+            EventRecord::try_from_client_event(
+                invalid_ingest_event_late,
+                ApiKey(API_KEY_STR.to_string()),
+                Site(SITE.to_string()),
+            )
+            .unwrap_err(),
             IngestRecordError::TimestampOutOfRange
         );
     }

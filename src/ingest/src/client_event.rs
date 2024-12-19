@@ -23,7 +23,6 @@ pub enum ClientEventType {
 /// in attrs by the client, but other data will be added by the server side.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ClientEvent {
-    pub api_id: String,
     pub event_type: ClientEventType,
     #[serde(with = "clickhouse::serde::uuid")]
     pub id: Uuid,

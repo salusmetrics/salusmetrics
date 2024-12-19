@@ -10,8 +10,11 @@ edition = "2021"
 license = "AGPL-3.0"
 
 [workspace.dependencies]
+ingest = { path = "src/ingest" }
+config = { path = "src/config" }
 axum = "0.7.9"
 clickhouse = { version = "0.13.1", features = ["time", "uuid"] }
+http = "1.2.0"
 hyper = "1.5.2"
 serde = { version = "1.0.216", features = ["derive"] }
 serde_repr = "0.1.19"
@@ -30,5 +33,9 @@ tower-http = { version = "0.6.2", features = [
     "trace",
 ] }
 tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
+tracing-subscriber = { version = "0.3.19", features = [
+    "env-filter",
+    "json",
+    "tracing-log",
+] }
 uuid = { version = "1.11.0", features = ["v7"] }

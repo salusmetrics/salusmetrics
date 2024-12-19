@@ -1,0 +1,10 @@
+[package]
+name = "config"
+description = "Common configuration libs for salusmetrics, a web and app analytics package that allows for ingestion, aggregation and reporting on web ann app analytics"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+tracing.workspace = true
+tracing-subscriber.workspace = true
