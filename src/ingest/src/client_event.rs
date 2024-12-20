@@ -1,5 +1,9 @@
+use http::header;
+use http::HeaderMap;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+
+use crate::ingest_error::IngestError;
 
 /// Type of analytics event submitted by client
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -9,6 +13,14 @@ pub enum ClientEventType {
     Section,
     Click,
 }
+
+/// Newtype wrapper for handling api_key
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ApiKey(pub String);
+
+/// Newtype wrapper for handling site
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Site(pub String);
 
 /// Represents IngestEvent that an external, untrusted client publishes
 ///
@@ -26,5 +38,30 @@ pub struct ClientEvent {
     pub event_type: ClientEventType,
     #[serde(with = "clickhouse::serde::uuid")]
     pub id: Uuid,
-    pub attrs: Vec<(String, String)>,
+    pub attrs: Option<Vec<(String, String)>>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct EventHeaders {
+    pub api_key: ApiKey,
+    pub site: Site,
+}
+
+impl TryFrom<&HeaderMap> for EventHeaders {
+    type Error = IngestError;
+
+    fn try_from(value: &HeaderMap) -> Result<Self, Self::Error> {
+        let site = Site(
+            value
+                .get(header::REFERER)
+                .ok_or(IngestError::Site)?
+                .to_str()
+                .map_err(|_| IngestError::Site)?
+                .to_string(),
+        );
+        Ok(EventHeaders {
+            api_key: ApiKey("123".to_string()),
+            site,
+        })
+    }
 }

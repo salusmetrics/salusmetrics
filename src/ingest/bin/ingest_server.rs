@@ -1,15 +1,15 @@
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use config::lifecycle::terminate_signal;
 use config::tracing::init_tracing_subscriber;
-use http::header::HOST;
 use hyper::{HeaderMap, StatusCode};
-use ingest::client_event::{ClientEvent, ClientEventType};
-use ingest::event_record::{ApiKey, EventRecord, Site};
+use ingest::client_event::{ClientEvent, ClientEventType, EventHeaders};
+use ingest::event_record::EventRecord;
 use std::env;
 use std::net::Ipv4Addr;
 use std::time::Duration;
-use tokio::signal;
+use tower_http::cors::{Any, CorsLayer};
 use tower_http::timeout::TimeoutLayer;
 use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 use tracing::instrument;
@@ -28,6 +28,14 @@ async fn main() {
         .route("/explore", get(explore))
         .route("/ingest", post(test_ingest))
         .layer(TraceLayer::new_for_http())
+        // TODO: narrow down allowed origins and more, plus move to common config crate
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods(Any)
+                .allow_headers(Any)
+                .max_age(Duration::from_secs(10)),
+        )
         .layer(CompressionLayer::new().gzip(true).deflate(true))
         .layer(TimeoutLayer::new(Duration::from_millis(timeout_millis)));
 
@@ -42,49 +50,24 @@ async fn main() {
     tracing::debug!("listening on {}", listener.local_addr().unwrap());
 
     axum::serve(listener, app)
-        .with_graceful_shutdown(shutdown_signal())
+        .with_graceful_shutdown(terminate_signal())
         .await
         .unwrap();
 }
 
 #[instrument]
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("failed to install Ctrl+C handler");
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("failed to install signal handler")
-            .recv()
-            .await;
-    };
-
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c => {},
-        _ = terminate => {},
-    }
-}
-
-#[instrument]
 async fn test_ingest(headers: HeaderMap, Json(event): Json<ClientEvent>) -> impl IntoResponse {
-    let host = headers.get(HOST).unwrap();
-    let for_insert = EventRecord::try_from_client_event(
-        event,
-        ApiKey("123-456".to_string()),
-        Site(host.to_str().unwrap().to_string()),
-    );
+    let Ok(event_headers) = EventHeaders::try_from(&headers) else {
+        return StatusCode::BAD_REQUEST;
+    };
+    let for_insert =
+        EventRecord::try_from_client_event(event, event_headers.api_key, event_headers.site);
 
-    if for_insert.is_ok() {
-        return (StatusCode::OK, Json("for_insert.unwrap()"));
-    }
-    (StatusCode::BAD_REQUEST, Json("for_insert.unwrap_err()"))
+    let Ok(record) = for_insert else {
+        return StatusCode::BAD_REQUEST;
+    };
+    tracing::debug!("record: {record:?}");
+    StatusCode::OK
 }
 
 #[instrument]
@@ -92,8 +75,10 @@ async fn explore() -> impl IntoResponse {
     let valid_ingest_event = ClientEvent {
         event_type: ClientEventType::Visitor,
         id: Uuid::now_v7(),
-        attrs: Vec::new(),
+        attrs: Some(Vec::new()),
     };
 
     (StatusCode::OK, Json(valid_ingest_event))
 }
+
+// fn extract_headers(headers: HeaderMap) -> Result<>

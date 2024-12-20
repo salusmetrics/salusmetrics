@@ -1,8 +1,8 @@
-use crate::client_event::{ClientEvent, ClientEventType};
+use crate::client_event::{ApiKey, ClientEvent, ClientEventType, Site};
+use crate::ingest_error::IngestError;
 use clickhouse::Row;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use thiserror::Error;
 use time::{Duration, OffsetDateTime};
 use tracing::instrument;
 use uuid::Uuid;
@@ -22,11 +22,6 @@ pub enum EventRecordType {
     Click = 5,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct ApiKey(pub String);
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Site(pub String);
-
 /// Represents the data that will actually be inserted into ClickHouse in the
 /// SALUS_METRICS.EVENT table. Expected usages is to call
 /// InsertIngestEvent::from_ingest_event on a IngestEvent that has been
@@ -41,18 +36,6 @@ pub struct EventRecord {
     #[serde(with = "clickhouse::serde::time::datetime")]
     ts: OffsetDateTime,
     attrs: Vec<(String, String)>,
-}
-
-/// Represent potential error cases for an IngestEvent, either due to data
-/// correctness issues or due to system availability problems.
-#[derive(Clone, Error, Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub enum IngestRecordError {
-    #[error("Timestamp from UUID beyond acceptable range for new event")]
-    TimestampOutOfRange,
-    #[error("UUID version mismatch - must be UUIDv7")]
-    UuidVersion,
-    #[error("UUID timestamp conversion error")]
-    UuidTimestampConversion,
 }
 
 impl From<ClientEventType> for EventRecordType {
@@ -78,7 +61,7 @@ impl EventRecord {
         value: ClientEvent,
         api_key: ApiKey,
         site: Site,
-    ) -> Result<Self, IngestRecordError> {
+    ) -> Result<Self, IngestError> {
         // Determine if the UUID is a proper v7 and if the date is close to now
 
         let uuid_datetime = try_uuid_datetime(&value.id)
@@ -90,7 +73,7 @@ impl EventRecord {
             event_type: value.event_type.into(),
             id: value.id,
             ts: verified_datetime,
-            attrs: value.attrs,
+            attrs: value.attrs.unwrap_or_default(),
         })
     }
 
@@ -101,15 +84,13 @@ impl EventRecord {
     /// than now + MAX_AFTER_PRESENT. Any value outside of this range will result
     /// in a TimestampOutOfRange error
     #[instrument]
-    fn verify_datetime_range(
-        datetime: OffsetDateTime,
-    ) -> Result<OffsetDateTime, IngestRecordError> {
+    fn verify_datetime_range(datetime: OffsetDateTime) -> Result<OffsetDateTime, IngestError> {
         let now = OffsetDateTime::now_utc();
         if (datetime < (now - MAX_DURATION_BEFORE_PRESENT))
             || (datetime > (now + MAX_DURATION_AFTER_PRESENT))
         {
             tracing::warn!("Time out of range from UUID");
-            Err(IngestRecordError::TimestampOutOfRange)
+            Err(IngestError::TimestampOutOfRange)
         } else {
             Ok(datetime)
         }
@@ -124,14 +105,14 @@ impl EventRecord {
 /// errors if the u64 cannot be properly converted to i64 or if the value
 /// is out of the component range of the OffsetDateTime crate.
 #[instrument]
-fn try_uuid_datetime(uuid: &Uuid) -> Result<OffsetDateTime, IngestRecordError> {
+fn try_uuid_datetime(uuid: &Uuid) -> Result<OffsetDateTime, IngestError> {
     let (sec, _) = uuid
         .get_timestamp()
-        .ok_or(IngestRecordError::UuidVersion)?
+        .ok_or(IngestError::UuidVersion)?
         .to_unix();
-    let sec_i64 = i64::try_from(sec).map_err(|_| IngestRecordError::UuidTimestampConversion)?;
+    let sec_i64 = i64::try_from(sec).map_err(|_| IngestError::UuidTimestampConversion)?;
     let offset = OffsetDateTime::from_unix_timestamp(sec_i64)
-        .map_err(|_| IngestRecordError::UuidTimestampConversion)?;
+        .map_err(|_| IngestError::UuidTimestampConversion)?;
     Ok(offset)
 }
 
@@ -157,7 +138,7 @@ mod tests {
         let uuid = Uuid::parse_str(UUID_V4_STR).unwrap();
         assert_eq!(
             try_uuid_datetime(&uuid).unwrap_err(),
-            IngestRecordError::UuidVersion
+            IngestError::UuidVersion
         );
     }
 
@@ -176,11 +157,11 @@ mod tests {
         // Should return an Err of type IngestError::TimestampOutOfRange
         assert_eq!(
             EventRecord::verify_datetime_range(invalid_early).unwrap_err(),
-            IngestRecordError::TimestampOutOfRange
+            IngestError::TimestampOutOfRange
         );
         assert_eq!(
             EventRecord::verify_datetime_range(invalid_late).unwrap_err(),
-            IngestRecordError::TimestampOutOfRange
+            IngestError::TimestampOutOfRange
         );
     }
 
@@ -191,7 +172,7 @@ mod tests {
         let valid_ingest_event = ClientEvent {
             event_type: ClientEventType::Visitor,
             id: uuid_now,
-            attrs: Vec::new(),
+            attrs: Some(Vec::new()),
         };
 
         let invalid_ingest_event_type = ClientEvent {
@@ -222,7 +203,7 @@ mod tests {
                 Site(SITE.to_string()),
             )
             .unwrap_err(),
-            IngestRecordError::UuidVersion
+            IngestError::UuidVersion
         );
         assert_eq!(
             EventRecord::try_from_client_event(
@@ -231,7 +212,7 @@ mod tests {
                 Site(SITE.to_string()),
             )
             .unwrap_err(),
-            IngestRecordError::TimestampOutOfRange
+            IngestError::TimestampOutOfRange
         );
         assert_eq!(
             EventRecord::try_from_client_event(
@@ -240,7 +221,7 @@ mod tests {
                 Site(SITE.to_string()),
             )
             .unwrap_err(),
-            IngestRecordError::TimestampOutOfRange
+            IngestError::TimestampOutOfRange
         );
     }
 }
