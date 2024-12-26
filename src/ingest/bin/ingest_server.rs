@@ -80,5 +80,3 @@ async fn explore() -> impl IntoResponse {
 
     (StatusCode::OK, Json(valid_ingest_event))
 }
-
-// fn extract_headers(headers: HeaderMap) -> Result<>
