@@ -1,6 +1,7 @@
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use clickhouse::Client;
 use config::lifecycle::terminate_signal;
 use config::tracing::init_tracing_subscriber;
 use hyper::{HeaderMap, StatusCode};
@@ -67,6 +68,22 @@ async fn test_ingest(headers: HeaderMap, Json(event): Json<ClientEvent>) -> impl
         return StatusCode::BAD_REQUEST;
     };
     tracing::debug!("record: {record:?}");
+
+    let client = Client::default()
+        .with_url("http://127.0.0.1:8123")
+        .with_user("default")
+        .with_password("")
+        .with_database("SALUS_METRICS");
+    let Ok(mut insert) = client.insert("EVENT") else {
+        return StatusCode::BAD_REQUEST;
+    };
+
+    if insert.write(&record).await.is_err() {
+        return StatusCode::BAD_REQUEST;
+    }
+    if insert.end().await.is_err() {
+        return StatusCode::BAD_REQUEST;
+    }
     StatusCode::OK
 }
 

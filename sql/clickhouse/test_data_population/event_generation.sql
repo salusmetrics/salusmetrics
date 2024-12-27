@@ -15,7 +15,15 @@ VALUES
   'Salus Metrics LLC - Dev Team'),
   ('510560e4-8660-430d-9e18-ce2c11134a21',
   'demo.salusmetrics.com',
-  'Salus Metrics LLC - Sales Demo')
+  'Salus Metrics LLC - Sales Demo'),
+  ('abc-xyz',
+  '127.0.0.1',
+  'Salus Metrics LLC - Local Development'),
+  ('abc-xyz',
+  'localhost',
+  'Salus Metrics LLC - Local Development')
+
+
 
 
 -------------------------------------------------------------------------------

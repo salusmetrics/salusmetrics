@@ -1,5 +1,6 @@
 use http::header;
 use http::HeaderMap;
+use http::Uri;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -51,17 +52,26 @@ impl TryFrom<&HeaderMap> for EventHeaders {
     type Error = IngestError;
 
     fn try_from(value: &HeaderMap) -> Result<Self, Self::Error> {
-        let site = Site(
+        let referer = value
+            .get(header::REFERER)
+            .ok_or(IngestError::Site)?
+            .to_str()
+            .map_err(|_| IngestError::Site)?;
+        let host = referer
+            .parse::<Uri>()
+            .map_err(|_| IngestError::Site)?
+            .host()
+            .ok_or(IngestError::Site)?
+            .to_string();
+        let site = Site(host);
+        let api_key = ApiKey(
             value
-                .get(header::REFERER)
-                .ok_or(IngestError::Site)?
+                .get("api-key")
+                .ok_or(IngestError::ApiKey)?
                 .to_str()
                 .map_err(|_| IngestError::Site)?
                 .to_string(),
         );
-        Ok(EventHeaders {
-            api_key: ApiKey("123".to_string()),
-            site,
-        })
+        Ok(EventHeaders { api_key, site })
     }
 }

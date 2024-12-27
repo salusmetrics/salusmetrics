@@ -8,4 +8,4 @@ CREATE DICTIONARY SALUS_METRICS.api_key_dictionary (
     `api_key` String,
     `site` String,
     `customer` String
-) PRIMARY KEY (api_key, site) SOURCE (CLICKHOUSE (TABLE 'API_KEY')) LAYOUT (COMPLEX_KEY_HASHED ()) LIFETIME (600);
+) PRIMARY KEY (api_key, site) SOURCE (CLICKHOUSE (TABLE 'API_KEY')) LAYOUT (COMPLEX_KEY_HASHED ()) LIFETIME (60);
