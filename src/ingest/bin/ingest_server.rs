@@ -1,13 +1,14 @@
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use clickhouse::Client;
-use config::lifecycle::terminate_signal;
-use config::tracing::init_tracing_subscriber;
+use conf::lifecycle::terminate_signal;
+use conf::metrics_database::try_get_metrics_client;
+use conf::tracing::init_tracing_subscriber;
 use hyper::{HeaderMap, StatusCode};
 use ingest::client_event::{ClientEvent, ClientEventType, EventHeaders};
 use ingest::event_record::EventRecord;
 use std::env;
+use std::error::Error;
 use std::net::Ipv4Addr;
 use std::time::Duration;
 use tower_http::cors::{Any, CorsLayer};
@@ -16,9 +17,12 @@ use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 use tracing::instrument;
 use uuid::Uuid;
 
+/// APP_NAME is used to resolve configuration parameters from ENV
+pub const APP_NAME: &str = "SALUS_INGEST";
+
 #[tokio::main]
-async fn main() {
-    init_tracing_subscriber();
+async fn main() -> Result<(), Box<dyn Error + 'static>> {
+    init_tracing_subscriber(APP_NAME)?;
 
     let timeout_millis: u64 = match env::var("HANDLER_TIMEOUT") {
         Ok(val) => val.parse().expect("Handler timeout is not a number!"),
@@ -29,7 +33,7 @@ async fn main() {
         .route("/explore", get(explore))
         .route("/ingest", post(test_ingest))
         .layer(TraceLayer::new_for_http())
-        // TODO: narrow down allowed origins and more, plus move to common config crate
+        // TODO: narrow down allowed origins and more, plus move to common conf crate
         .layer(
             CorsLayer::new()
                 .allow_origin(Any)
@@ -54,6 +58,7 @@ async fn main() {
         .with_graceful_shutdown(terminate_signal())
         .await
         .unwrap();
+    Ok(())
 }
 
 #[instrument]
@@ -69,11 +74,9 @@ async fn test_ingest(headers: HeaderMap, Json(event): Json<ClientEvent>) -> impl
     };
     tracing::debug!("record: {record:?}");
 
-    let client = Client::default()
-        .with_url("http://127.0.0.1:8123")
-        .with_user("default")
-        .with_password("")
-        .with_database("SALUS_METRICS");
+    let Ok(client) = try_get_metrics_client(APP_NAME) else {
+        return StatusCode::BAD_REQUEST;
+    };
     let Ok(mut insert) = client.insert("EVENT") else {
         return StatusCode::BAD_REQUEST;
     };

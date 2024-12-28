@@ -6,7 +6,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-config.workspace = true
+conf.workspace = true
 axum.workspace = true
 clickhouse.workspace = true
 http.workspace = true

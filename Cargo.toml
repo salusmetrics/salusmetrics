@@ -11,9 +11,10 @@ license = "AGPL-3.0"
 
 [workspace.dependencies]
 ingest = { path = "src/ingest" }
-config = { path = "src/config" }
+conf = { path = "src/conf" }
 axum = "0.7.9"
 clickhouse = { version = "0.13.1", features = ["time", "uuid"] }
+config = { version = "0.15.4", features = ["toml"] }
 http = "1.2.0"
 hyper = "1.5.2"
 serde = { version = "1.0.216", features = ["derive"] }
