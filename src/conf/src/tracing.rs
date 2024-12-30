@@ -22,3 +22,27 @@ pub fn init_tracing_subscriber(app_name: &str) -> Result<(), ConfError> {
         .init();
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        conf_error::ConfError,
+        settings::tests::{cleanup_test_env, setup_valid_test_env, APP_NAME},
+    };
+
+    use super::init_tracing_subscriber;
+
+    #[test]
+    fn test_init_tracing_subscriber() {
+        // test positive case
+        setup_valid_test_env();
+        init_tracing_subscriber(APP_NAME).unwrap();
+        cleanup_test_env();
+
+        // test negative case
+        assert_eq!(
+            init_tracing_subscriber(APP_NAME).unwrap_err(),
+            ConfError::Env
+        );
+    }
+}

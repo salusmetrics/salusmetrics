@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 /// Represent potential error cases for configuring a Salus Metrics App
-#[derive(Error, Debug)]
+#[derive(Clone, Error, Debug, PartialEq, Eq)]
 pub enum ConfError {
     #[error("Could not derive settings from environment")]
     Env,
