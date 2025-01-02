@@ -1,9 +1,10 @@
+use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use conf::lifecycle::terminate_signal;
 use conf::listener::try_new_listener;
-use conf::metrics_database::try_get_metrics_client;
+use conf::state::AppState;
 use conf::tracing::init_tracing_subscriber;
 use hyper::{HeaderMap, StatusCode};
 use ingest::client_event::{ClientEvent, ClientEventType, EventHeaders};
@@ -24,6 +25,8 @@ pub const APP_NAME: &str = "SALUS_INGEST";
 async fn main() -> Result<(), Box<dyn Error + 'static>> {
     init_tracing_subscriber(APP_NAME)?;
 
+    let state = AppState::try_new(APP_NAME)?;
+
     let timeout_millis: u64 = match env::var("HANDLER_TIMEOUT") {
         Ok(val) => val.parse().expect("Handler timeout is not a number!"),
         Err(_) => 30000,
@@ -42,7 +45,8 @@ async fn main() -> Result<(), Box<dyn Error + 'static>> {
                 .max_age(Duration::from_secs(10)),
         )
         .layer(CompressionLayer::new().gzip(true).deflate(true))
-        .layer(TimeoutLayer::new(Duration::from_millis(timeout_millis)));
+        .layer(TimeoutLayer::new(Duration::from_millis(timeout_millis)))
+        .with_state(state);
 
     let listener = try_new_listener(APP_NAME).await?;
     tracing::debug!("listening on {}", listener.local_addr().unwrap());
@@ -54,8 +58,11 @@ async fn main() -> Result<(), Box<dyn Error + 'static>> {
     Ok(())
 }
 
-#[instrument]
-async fn test_ingest(headers: HeaderMap, Json(event): Json<ClientEvent>) -> impl IntoResponse {
+async fn test_ingest(
+    State(app_state): State<AppState>,
+    headers: HeaderMap,
+    Json(event): Json<ClientEvent>,
+) -> impl IntoResponse {
     let Ok(event_headers) = EventHeaders::try_from(&headers) else {
         return StatusCode::BAD_REQUEST;
     };
@@ -67,9 +74,7 @@ async fn test_ingest(headers: HeaderMap, Json(event): Json<ClientEvent>) -> impl
     };
     tracing::debug!("record: {record:?}");
 
-    let Ok(client) = try_get_metrics_client(APP_NAME) else {
-        return StatusCode::BAD_REQUEST;
-    };
+    let client = app_state.metrics_db_client;
     let Ok(mut insert) = client.insert("EVENT") else {
         return StatusCode::BAD_REQUEST;
     };
