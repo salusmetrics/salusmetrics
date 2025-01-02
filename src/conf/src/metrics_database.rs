@@ -28,18 +28,18 @@ pub fn try_get_metrics_client(app_name: &str) -> Result<Client, ConfError> {
 
 #[cfg(test)]
 mod tests {
-    use crate::settings::tests::{cleanup_test_env, setup_valid_test_env, APP_NAME};
+    use crate::settings::tests::{cleanup_test_env, setup_valid_test_env};
 
     use super::try_get_metrics_client;
 
     #[test]
     fn test_try_get_metrics_client() {
         // Positive test case
-        setup_valid_test_env();
-        try_get_metrics_client(APP_NAME).unwrap();
-        cleanup_test_env();
+        let app_name = setup_valid_test_env();
+        try_get_metrics_client(&app_name).unwrap();
+        cleanup_test_env(&app_name);
 
         // Negative test case
-        assert!(try_get_metrics_client(APP_NAME).is_err());
+        assert!(try_get_metrics_client("INVALID_APP_NAME").is_err());
     }
 }

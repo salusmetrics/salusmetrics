@@ -2,6 +2,7 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use conf::lifecycle::terminate_signal;
+use conf::listener::try_new_listener;
 use conf::metrics_database::try_get_metrics_client;
 use conf::tracing::init_tracing_subscriber;
 use hyper::{HeaderMap, StatusCode};
@@ -9,7 +10,6 @@ use ingest::client_event::{ClientEvent, ClientEventType, EventHeaders};
 use ingest::event_record::EventRecord;
 use std::env;
 use std::error::Error;
-use std::net::Ipv4Addr;
 use std::time::Duration;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::timeout::TimeoutLayer;
@@ -44,14 +44,7 @@ async fn main() -> Result<(), Box<dyn Error + 'static>> {
         .layer(CompressionLayer::new().gzip(true).deflate(true))
         .layer(TimeoutLayer::new(Duration::from_millis(timeout_millis)));
 
-    let port: u16 = match env::var("HANDLER_PORT") {
-        Ok(val) => val.parse().expect("Handler port is not a number!"),
-        Err(_) => 3000,
-    };
-
-    let addr = std::net::SocketAddr::from((Ipv4Addr::UNSPECIFIED, port));
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-
+    let listener = try_new_listener(APP_NAME).await?;
     tracing::debug!("listening on {}", listener.local_addr().unwrap());
 
     axum::serve(listener, app)

@@ -1,6 +1,8 @@
 use tokio::signal;
+use tracing::instrument;
 
 /// Common function to handle graceful shutdown of the service
+#[instrument]
 pub async fn terminate_signal() {
     let ctrl_c = async {
         signal::ctrl_c()
