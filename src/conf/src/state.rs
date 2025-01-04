@@ -1,7 +1,7 @@
 use clickhouse::Client;
 
 use crate::conf_error::ConfError;
-use crate::metrics_database::try_get_metrics_client;
+use crate::metrics_database::try_create_metrics_client;
 
 /// State struct that provides information like the Clickhouse DB Client
 #[derive(Clone)]
@@ -13,7 +13,7 @@ impl AppState {
     pub fn try_new(app_name: &str) -> Result<Self, ConfError> {
         assert!(!app_name.is_empty());
 
-        let metrics_db_client = try_get_metrics_client(app_name)?;
+        let metrics_db_client = try_create_metrics_client(app_name)?;
         Ok(AppState { metrics_db_client })
     }
 }

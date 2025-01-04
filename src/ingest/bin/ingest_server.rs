@@ -2,18 +2,14 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use conf::lifecycle::terminate_signal;
-use conf::listener::try_new_listener;
+use conf::conf_error::ConfError;
 use conf::state::AppState;
-use conf::tracing::init_tracing_subscriber;
+use http::Method;
 use hyper::{HeaderMap, StatusCode};
 use ingest::client_event::{ClientEvent, ClientEventType, EventHeaders};
 use ingest::event_record::EventRecord;
-use std::env;
 use std::error::Error;
-use std::time::Duration;
-use tower_http::cors::{Any, CorsLayer};
-use tower_http::timeout::TimeoutLayer;
+use tower_http::cors::Any;
 use tower_http::{compression::CompressionLayer, trace::TraceLayer};
 use tracing::instrument;
 use uuid::Uuid;
@@ -23,36 +19,31 @@ pub const APP_NAME: &str = "SALUS_INGEST";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + 'static>> {
-    init_tracing_subscriber(APP_NAME)?;
+    conf::tracing::init_tracing_subscriber(APP_NAME)?;
 
     let state = AppState::try_new(APP_NAME)?;
 
-    let timeout_millis: u64 = match env::var("HANDLER_TIMEOUT") {
-        Ok(val) => val.parse().expect("Handler timeout is not a number!"),
-        Err(_) => 30000,
-    };
+    let layer_settings = conf::layer::LayerSettings::try_new(APP_NAME)?;
+    let cors_layer = layer_settings
+        .try_create_cors_layer()?
+        .ok_or(ConfError::Cors)?
+        .allow_methods([Method::POST])
+        .allow_headers(Any);
 
     let app = Router::new()
         .route("/explore", get(explore))
         .route("/ingest", post(test_ingest))
         .layer(TraceLayer::new_for_http())
-        // TODO: narrow down allowed origins and more, plus move to common conf crate
-        .layer(
-            CorsLayer::new()
-                .allow_origin(Any)
-                .allow_methods(Any)
-                .allow_headers(Any)
-                .max_age(Duration::from_secs(10)),
-        )
+        .layer(cors_layer)
         .layer(CompressionLayer::new().gzip(true).deflate(true))
-        .layer(TimeoutLayer::new(Duration::from_millis(timeout_millis)))
+        .layer(layer_settings.create_timeout_layer())
         .with_state(state);
 
-    let listener = try_new_listener(APP_NAME).await?;
+    let listener = conf::listener::try_new_listener(APP_NAME).await?;
     tracing::debug!("listening on {}", listener.local_addr().unwrap());
 
     axum::serve(listener, app)
-        .with_graceful_shutdown(terminate_signal())
+        .with_graceful_shutdown(conf::lifecycle::terminate_signal())
         .await
         .unwrap();
     Ok(())

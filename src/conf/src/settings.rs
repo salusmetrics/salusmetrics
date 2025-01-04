@@ -1,13 +1,14 @@
-use crate::conf_error::ConfError;
 use crate::listener::ListenerSettings;
 use crate::metrics_database::MetricsDatabaseSettings;
 use crate::tracing::TracingSettings;
+use crate::{conf_error::ConfError, layer::LayerSettings};
 use config::{Config, Environment};
 use serde::{Deserialize, Serialize};
 
 /// Settings struct that is common between different apps that make up salus metrics
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct SharedSettings {
+    pub layer: Option<LayerSettings>,
     pub listener: Option<ListenerSettings>,
     pub metricsdb: Option<MetricsDatabaseSettings>,
     pub tracing: TracingSettings,
@@ -19,12 +20,18 @@ impl SharedSettings {
     pub fn try_new(app_name: &str) -> Result<Self, ConfError> {
         assert!(!app_name.is_empty());
 
-        let config = Config::builder()
-            .add_source(Environment::with_prefix(app_name).separator("_"))
+        Config::builder()
+            .add_source(
+                Environment::with_prefix(app_name)
+                    .with_list_parse_key("layer.cors.origins")
+                    .try_parsing(true)
+                    .separator("_")
+                    .list_separator(" "),
+            )
             .build()
-            .map_err(|_| ConfError::Env)?;
-        let setting: SharedSettings = config.try_deserialize().map_err(|_| ConfError::Env)?;
-        Ok(setting)
+            .map_err(|_| ConfError::Env)?
+            .try_deserialize()
+            .map_err(|_| ConfError::Env)
     }
 }
 
@@ -37,6 +44,13 @@ pub(crate) mod tests {
 
     use super::SharedSettings;
     const VALID_SETTINGS_ARR: &[(&str, &str, &str)] = &[
+        (
+            "LAYER",
+            "CORS_ORIGINS",
+            "http://localhost:3000 http://127.0.0.1:3000",
+        ),
+        ("LAYER", "CORS_MAX_AGE_SECS", "60"),
+        ("LAYER", "TIMEOUT_MILLIS", "4400"),
         ("LISTENER", "IPV4", "0.0.0.0"),
         ("LISTENER", "PORT", "3000"),
         ("METRICSDB", "URL", "http://localhost:8123"),
@@ -49,23 +63,22 @@ pub(crate) mod tests {
     #[test]
     fn test_try_new() {
         // positive case
-        get_valid_env();
+        create_valid_env();
         // negative case
-        let invalid_app_name = Uuid::now_v7().to_string();
         assert_eq!(
-            SharedSettings::try_new(&invalid_app_name).unwrap_err(),
+            SharedSettings::try_new("INVALID_APP_NAME").unwrap_err(),
             ConfError::Env
         );
     }
 
     /// For Testing Only - self-contained method for establishing test settings
     /// and performing cleanup
-    pub(crate) fn get_valid_env() -> SharedSettings {
+    pub(crate) fn create_valid_env() -> SharedSettings {
         let app_name = setup_valid_test_env();
         let settings = SharedSettings::try_new(&app_name).unwrap();
         cleanup_test_env(&app_name);
 
-        // Provide for other tests to utilize
+        // return for other tests to utilize
         settings
     }
 
@@ -76,7 +89,9 @@ pub(crate) mod tests {
     pub(crate) fn setup_valid_test_env() -> String {
         let app_name = Uuid::now_v7().to_string();
         for (pre, post, val) in VALID_SETTINGS_ARR {
-            set_var(format!("{}_{}_{}", app_name, pre, post), val);
+            let key = format!("{}_{}_{}", app_name, pre, post);
+            set_var(&key, val);
+            println!("{} = {}", &key, val);
         }
         app_name
     }
