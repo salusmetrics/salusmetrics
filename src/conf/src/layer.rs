@@ -4,7 +4,7 @@ use http::HeaderValue;
 use serde::{Deserialize, Serialize};
 use tower_http::{cors::CorsLayer, timeout::TimeoutLayer};
 
-use crate::{conf_error::ConfError, settings::SharedSettings};
+use crate::{conf_error::ConfError, settings::CommonSettings};
 
 pub const DEFAULT_TIMEOUT_MILLIS: u64 = 30000;
 
@@ -89,7 +89,9 @@ impl Default for LayerSettings {
 impl LayerSettings {
     pub fn try_new(app_name: &str) -> Result<Self, ConfError> {
         assert!(!app_name.is_empty());
-        Ok(SharedSettings::try_new(app_name)?.layer.unwrap_or_default())
+        Ok(CommonSettings::try_new_from_env(app_name)?
+            .layer
+            .unwrap_or_default())
     }
 
     /// Returns an Axum TimeoutLayer that will use ENV values for the timeout in millis.
@@ -117,7 +119,7 @@ mod tests {
         conf_error::ConfError,
         settings::{
             tests::{cleanup_test_env, create_valid_env, setup_valid_test_env},
-            SharedSettings,
+            CommonSettings,
         },
     };
 
@@ -127,7 +129,10 @@ mod tests {
     fn test_try_new_layer_settings() {
         // Positive test case
         let app_name = setup_valid_test_env();
-        let _ = SharedSettings::try_new(&app_name).unwrap().layer.unwrap();
+        let _ = CommonSettings::try_new_from_env(&app_name)
+            .unwrap()
+            .layer
+            .unwrap();
         cleanup_test_env(&app_name);
     }
 

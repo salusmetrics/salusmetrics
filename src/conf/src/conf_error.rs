@@ -1,6 +1,9 @@
 use thiserror::Error;
 
-/// Represent potential error cases for configuring a Salus Metrics App
+/// `ConfError` represents potential error cases for configuring a metrics
+/// application instance. Errors of type ConfError should only be encountered
+/// at application startup or in the event where configuration is somehow
+/// reloaded.
 #[derive(Clone, Error, Debug, PartialEq, Eq)]
 pub enum ConfError {
     #[error("Unable to properly set up CORS layer from env configuration")]

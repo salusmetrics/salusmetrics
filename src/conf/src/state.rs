@@ -1,37 +1,45 @@
 use clickhouse::Client;
 
 use crate::conf_error::ConfError;
-use crate::metrics_database::try_create_metrics_client;
+use crate::settings::CommonSettings;
 
-/// State struct that provides information like the Clickhouse DB Client
+/// `CommonAppState` implements `Clone` and is intended to be used as a basis
+/// for axum state across metrics applications. Provides Clickhouse `Client`
+/// that will allow a common connection pool to be used for all http requests.
 #[derive(Clone)]
-pub struct AppState {
+pub struct CommonAppState {
     pub metrics_db_client: Client,
 }
 
-impl AppState {
-    pub fn try_new(app_name: &str) -> Result<Self, ConfError> {
-        assert!(!app_name.is_empty());
+impl TryFrom<&CommonSettings> for CommonAppState {
+    type Error = ConfError;
+    fn try_from(value: &CommonSettings) -> Result<Self, Self::Error> {
+        let metrics_settings = value.metricsdb.to_owned().ok_or(ConfError::MetricsDb)?;
 
-        let metrics_db_client = try_create_metrics_client(app_name)?;
-        Ok(AppState { metrics_db_client })
+        Ok(CommonAppState {
+            metrics_db_client: Client::from(&metrics_settings),
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::settings::tests::{cleanup_test_env, setup_valid_test_env};
+    use crate::{metrics_database::MetricsDatabaseSettings, settings::CommonSettings};
 
-    use super::AppState;
+    use super::CommonAppState;
 
     #[test]
-    fn test_try_new() {
+    fn test_try_from() {
         //positive test case
-        let app_name = setup_valid_test_env();
-        AppState::try_new(&app_name).unwrap();
-        cleanup_test_env(&app_name);
-
-        // negative test case
-        assert!(AppState::try_new("INVALID_APP_NAME").is_err());
+        let valid_settings = CommonSettings {
+            metricsdb: Some(MetricsDatabaseSettings {
+                database: "METRICS_DB".to_owned(),
+                pass: "pass".to_owned(),
+                url: "http://localhost:8123".to_owned(),
+                user: "user".to_owned(),
+            }),
+            ..Default::default()
+        };
+        let _ = CommonAppState::try_from(&valid_settings).unwrap();
     }
 }

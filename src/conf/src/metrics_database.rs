@@ -1,8 +1,8 @@
-use crate::{conf_error::ConfError, settings::SharedSettings};
 use clickhouse::Client;
 use serde::{Deserialize, Serialize};
 
-/// Metrics Database settings - ENV variables use the `METRICSDB` sub-prefix
+/// `MetricsDatabaseSettings` represents the required parameters for connecting
+/// to the Clickhouse database instance in which metrics data is being recorded
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MetricsDatabaseSettings {
     pub url: String,
@@ -11,35 +11,30 @@ pub struct MetricsDatabaseSettings {
     pub pass: String,
 }
 
-/// Attempt to create a Clickhouse Client for the given app_name, which will
-/// be used to examine ENV for SharedSettings for this app.
-pub fn try_create_metrics_client(app_name: &str) -> Result<Client, ConfError> {
-    assert!(!app_name.is_empty());
-
-    let metrics_settings = SharedSettings::try_new(app_name)?
-        .metricsdb
-        .ok_or(ConfError::MetricsDb)?;
-    Ok(Client::default()
-        .with_url(metrics_settings.url)
-        .with_user(metrics_settings.user)
-        .with_password(metrics_settings.pass)
-        .with_database(metrics_settings.database))
+impl From<&MetricsDatabaseSettings> for Client {
+    fn from(value: &MetricsDatabaseSettings) -> Self {
+        Client::default()
+            .with_url(value.url.to_owned())
+            .with_user(value.user.to_owned())
+            .with_password(value.pass.to_owned())
+            .with_database(value.database.to_owned())
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::settings::tests::{cleanup_test_env, setup_valid_test_env};
+    use clickhouse::Client;
 
-    use super::try_create_metrics_client;
+    use super::MetricsDatabaseSettings;
 
     #[test]
-    fn test_try_create_metrics_client() {
-        // Positive test case
-        let app_name = setup_valid_test_env();
-        try_create_metrics_client(&app_name).unwrap();
-        cleanup_test_env(&app_name);
-
-        // Negative test case
-        assert!(try_create_metrics_client("INVALID_APP_NAME").is_err());
+    fn test_into_client() {
+        let test_settings = MetricsDatabaseSettings {
+            database: "METRICS".to_owned(),
+            pass: "test_pass".to_owned(),
+            url: "http://localhost:8123".to_owned(),
+            user: "test_user".to_owned(),
+        };
+        let _: Client = Client::from(&test_settings);
     }
 }

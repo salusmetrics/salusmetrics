@@ -3,7 +3,8 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use conf::conf_error::ConfError;
-use conf::state::AppState;
+use conf::settings::CommonSettings;
+use conf::state::CommonAppState;
 use http::Method;
 use hyper::{HeaderMap, StatusCode};
 use ingest::client_event::{ClientEvent, ClientEventType, EventHeaders};
@@ -19,9 +20,9 @@ pub const APP_NAME: &str = "SALUS_INGEST";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + 'static>> {
-    conf::tracing::init_tracing_subscriber(APP_NAME)?;
-
-    let state = AppState::try_new(APP_NAME)?;
+    let env_settings = CommonSettings::try_new_from_env(APP_NAME)?;
+    env_settings.tracing.try_init_tracing_subscriber()?;
+    let state: CommonAppState = (&env_settings).try_into()?;
 
     let layer_settings = conf::layer::LayerSettings::try_new(APP_NAME)?;
     let cors_layer = layer_settings
@@ -39,7 +40,11 @@ async fn main() -> Result<(), Box<dyn Error + 'static>> {
         .layer(layer_settings.create_timeout_layer())
         .with_state(state);
 
-    let listener = conf::listener::try_new_listener(APP_NAME).await?;
+    let listener = env_settings
+        .listener
+        .ok_or(ConfError::Listener)?
+        .try_new_listener()
+        .await?;
     tracing::debug!("listening on {}", listener.local_addr().unwrap());
 
     axum::serve(listener, app)
@@ -50,7 +55,7 @@ async fn main() -> Result<(), Box<dyn Error + 'static>> {
 }
 
 async fn test_ingest(
-    State(app_state): State<AppState>,
+    State(app_state): State<CommonAppState>,
     headers: HeaderMap,
     Json(event): Json<ClientEvent>,
 ) -> impl IntoResponse {

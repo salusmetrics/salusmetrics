@@ -1,11 +1,13 @@
 use serde::{Deserialize, Serialize};
-use std::net::{Ipv4Addr, Ipv6Addr};
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use tokio::net::TcpListener;
 use tracing::instrument;
 
-use crate::{conf_error::ConfError, settings};
+use crate::conf_error::ConfError;
 
-/// Axum handler listener settings
+/// `ListenerSettings` are used to determine the HTTP listener characteristics
+/// of a given metrics application. These include IPv4 or IPv6 address
+/// (exclusive) should be attached to as well as the port.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ListenerSettings {
     pub port: u16,
@@ -13,44 +15,111 @@ pub struct ListenerSettings {
     pub ipv6: Option<Ipv6Addr>,
 }
 
-/// Set up port and address that the service will listen on by examining
-/// ENV for the provided app name
-#[instrument]
-pub async fn try_new_listener(app_name: &str) -> Result<TcpListener, ConfError> {
-    let settings = settings::SharedSettings::try_new(app_name)?
-        .listener
-        .ok_or(ConfError::Listener)?;
-    let addr = match (settings.ipv4, settings.ipv6) {
-        (Some(_), Some(_)) => {
-            tracing::error!("env specified both IPv4 and IPv6 addresses");
-            return Err(ConfError::Listener);
-        }
-        (None, None) => std::net::SocketAddr::from((Ipv4Addr::UNSPECIFIED, settings.port)),
-        (Some(v4), None) => std::net::SocketAddr::from((v4, settings.port)),
-        (None, Some(v6)) => std::net::SocketAddr::from((v6, settings.port)),
-    };
+impl TryFrom<&ListenerSettings> for SocketAddr {
+    type Error = ConfError;
 
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .map_err(|_| ConfError::Listener)?;
-    Ok(listener)
+    #[instrument]
+    fn try_from(value: &ListenerSettings) -> Result<Self, Self::Error> {
+        match (value.ipv4, value.ipv6) {
+            (Some(_), Some(_)) => {
+                tracing::error!("env specified both IPv4 and IPv6 addresses");
+                Err(ConfError::Listener)
+            }
+            (None, None) => Ok(SocketAddr::from((Ipv4Addr::UNSPECIFIED, value.port))),
+            (Some(v4), None) => Ok(SocketAddr::from((v4, value.port))),
+            (None, Some(v6)) => Ok(SocketAddr::from((v6, value.port))),
+        }
+    }
+}
+
+impl ListenerSettings {
+    /// Attempt to bind a listener to the specified IP and port for this
+    /// `ListenerSettings` struct
+    #[instrument]
+    pub async fn try_new_listener(&self) -> Result<TcpListener, ConfError> {
+        tokio::net::TcpListener::bind(SocketAddr::try_from(self)?)
+            .await
+            .map_err(|_| ConfError::Listener)
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::settings::tests::{cleanup_test_env, setup_valid_test_env};
+    use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 
-    use super::try_new_listener;
+    use crate::conf_error::ConfError;
+
+    use super::ListenerSettings;
+
+    #[test]
+    fn test_try_from() {
+        // Valid cases
+        let valid_just_port_settings = ListenerSettings {
+            ipv4: None,
+            ipv6: None,
+            port: 8080,
+        };
+        let _ = SocketAddr::try_from(&valid_just_port_settings).unwrap();
+
+        let valid_v4_settings = ListenerSettings {
+            ipv4: Some(Ipv4Addr::LOCALHOST),
+            ipv6: None,
+            port: 8080,
+        };
+        let _ = SocketAddr::try_from(&valid_v4_settings).unwrap();
+
+        let valid_v6_settings = ListenerSettings {
+            ipv4: None,
+            ipv6: Some(Ipv6Addr::LOCALHOST),
+            port: 8080,
+        };
+        let _ = SocketAddr::try_from(&valid_v6_settings).unwrap();
+
+        // Failure case expected
+        let invalid_settings = ListenerSettings {
+            ipv4: Some(Ipv4Addr::LOCALHOST),
+            ipv6: Some(Ipv6Addr::LOCALHOST),
+            port: 8080,
+        };
+        assert_eq!(
+            SocketAddr::try_from(&invalid_settings).unwrap_err(),
+            ConfError::Listener
+        );
+    }
 
     #[tokio::test]
     async fn test_try_new_listener() {
-        // Test the positive case first
-        let app_name = setup_valid_test_env();
-        try_new_listener(&app_name).await.unwrap();
-        cleanup_test_env(&app_name);
-
         // Test negative case
-        let res = try_new_listener("INVALID_APP_NAME").await;
-        assert!(res.is_err());
+        let invalid_settings = ListenerSettings {
+            ipv4: Some(Ipv4Addr::LOCALHOST),
+            ipv6: Some(Ipv6Addr::LOCALHOST),
+            port: 8080,
+        };
+        assert_eq!(
+            invalid_settings.try_new_listener().await.unwrap_err(),
+            ConfError::Listener
+        );
+
+        // Positive test cases
+        let valid_just_port_settings = ListenerSettings {
+            ipv4: None,
+            ipv6: None,
+            port: 8080,
+        };
+        valid_just_port_settings.try_new_listener().await.unwrap();
+
+        let valid_v4_settings = ListenerSettings {
+            ipv4: Some(Ipv4Addr::LOCALHOST),
+            ipv6: None,
+            port: 3000,
+        };
+        valid_v4_settings.try_new_listener().await.unwrap();
+
+        let valid_v6_settings = ListenerSettings {
+            ipv4: None,
+            ipv6: Some(Ipv6Addr::LOCALHOST),
+            port: 30000,
+        };
+        valid_v6_settings.try_new_listener().await.unwrap();
     }
 }

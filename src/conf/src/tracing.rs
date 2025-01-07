@@ -1,48 +1,60 @@
-use crate::{conf_error::ConfError, settings::SharedSettings};
+use crate::conf_error::ConfError;
 use serde::{Deserialize, Serialize};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-/// Tracing settings - ENV variables use the `TRACING` sub-prefix
+/// `TracingSettings` represents the application-wide settings that will be used
+/// to set up a `tracing_subscriber::EnvFilter`. The `directive` is intended to
+/// be passed along to `EnvFilter::try_new`.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TracingSettings {
     pub directive: String,
 }
 
-/// Common function to set up tracing subscriber across services.
-pub fn init_tracing_subscriber(app_name: &str) -> Result<(), ConfError> {
-    assert!(!app_name.is_empty());
+impl Default for TracingSettings {
+    fn default() -> Self {
+        TracingSettings {
+            directive: "ERROR".to_owned(),
+        }
+    }
+}
 
-    let settings = SharedSettings::try_new(app_name)?;
-    let filter_layer = tracing_subscriber::EnvFilter::try_new(settings.tracing.directive)
-        .map_err(|_| ConfError::Tracing)?;
+impl TryInto<EnvFilter> for &TracingSettings {
+    type Error = ConfError;
+    fn try_into(self) -> Result<EnvFilter, Self::Error> {
+        EnvFilter::try_new(&self.directive).map_err(|_| ConfError::Tracing)
+    }
+}
 
-    tracing_subscriber::registry()
-        .with(filter_layer)
-        .with(tracing_subscriber::fmt::layer().compact().with_target(true))
-        .init();
-    Ok(())
+impl TracingSettings {
+    /// Attempt to initialize the tracing subscriber based on settings
+    pub fn try_init_tracing_subscriber(&self) -> Result<(), ConfError> {
+        let filter_layer: EnvFilter = self.try_into()?;
+        tracing_subscriber::registry()
+            .with(filter_layer)
+            .with(tracing_subscriber::fmt::layer().compact().with_target(true))
+            .init();
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        conf_error::ConfError,
-        settings::tests::{cleanup_test_env, setup_valid_test_env},
-    };
-
-    use super::init_tracing_subscriber;
+    use super::TracingSettings;
 
     #[test]
-    fn test_init_tracing_subscriber() {
-        // test positive case
-        let app_name = setup_valid_test_env();
-        init_tracing_subscriber(&app_name).unwrap();
-        cleanup_test_env(&app_name);
+    fn test_try_into() {
+        let to_test = TracingSettings {
+            directive: "error".to_owned(),
+        };
+        let _: tracing_subscriber::EnvFilter = (&to_test).try_into().unwrap();
+    }
 
-        // test negative case
-        assert_eq!(
-            init_tracing_subscriber("INVALID_APP_NAME").unwrap_err(),
-            ConfError::Env
-        );
+    #[test]
+    fn test_try_init_tracing_subscriber() {
+        let to_test = TracingSettings {
+            directive: "error".to_owned(),
+        };
+
+        to_test.try_init_tracing_subscriber().unwrap();
     }
 }

@@ -6,23 +6,23 @@ use config::{Config, Environment};
 use serde::{Deserialize, Serialize};
 
 /// Settings struct that is common between different apps that make up salus metrics
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct SharedSettings {
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
+pub struct CommonSettings {
     pub layer: Option<LayerSettings>,
     pub listener: Option<ListenerSettings>,
     pub metricsdb: Option<MetricsDatabaseSettings>,
     pub tracing: TracingSettings,
 }
 
-impl SharedSettings {
-    /// Attempt to create a SharedSettings from the ENV for the specified app.
+impl CommonSettings {
+    /// Attempt to create a CommonSettings from the ENV for the specified app.
     /// app_name will be used as the prefix for all settings for this app.
-    pub fn try_new(app_name: &str) -> Result<Self, ConfError> {
-        assert!(!app_name.is_empty());
+    pub fn try_new_from_env(app_name: impl AsRef<str>) -> Result<Self, ConfError> {
+        assert!(!app_name.as_ref().is_empty());
 
         Config::builder()
             .add_source(
-                Environment::with_prefix(app_name)
+                Environment::with_prefix(app_name.as_ref())
                     .with_list_parse_key("layer.cors.origins")
                     .try_parsing(true)
                     .separator("_")
@@ -42,7 +42,7 @@ pub(crate) mod tests {
 
     use crate::conf_error::ConfError;
 
-    use super::SharedSettings;
+    use super::CommonSettings;
     const VALID_SETTINGS_ARR: &[(&str, &str, &str)] = &[
         (
             "LAYER",
@@ -61,21 +61,21 @@ pub(crate) mod tests {
     ];
 
     #[test]
-    fn test_try_new() {
+    fn test_try_new_from_env() {
         // positive case
         create_valid_env();
         // negative case
         assert_eq!(
-            SharedSettings::try_new("INVALID_APP_NAME").unwrap_err(),
+            CommonSettings::try_new_from_env("INVALID_APP_NAME").unwrap_err(),
             ConfError::Env
         );
     }
 
     /// For Testing Only - self-contained method for establishing test settings
     /// and performing cleanup
-    pub(crate) fn create_valid_env() -> SharedSettings {
+    pub(crate) fn create_valid_env() -> CommonSettings {
         let app_name = setup_valid_test_env();
-        let settings = SharedSettings::try_new(&app_name).unwrap();
+        let settings = CommonSettings::try_new_from_env(&app_name).unwrap();
         cleanup_test_env(&app_name);
 
         // return for other tests to utilize
