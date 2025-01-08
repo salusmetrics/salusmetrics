@@ -37,7 +37,11 @@ impl CommonSettings {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::env::{remove_var, set_var};
+    use clickhouse::Client;
+    use std::{
+        env::{remove_var, set_var},
+        net::SocketAddr,
+    };
     use uuid::Uuid;
 
     use crate::conf_error::ConfError;
@@ -57,13 +61,41 @@ pub(crate) mod tests {
         ("METRICSDB", "DATABASE", "TEST"),
         ("METRICSDB", "USER", "TEST"),
         ("METRICSDB", "PASS", "TEST"),
-        ("TRACING", "DIRECTIVE", "warn"),
+        ("TRACING", "DIRECTIVE", "trace"),
     ];
 
     #[test]
     fn test_try_new_from_env() {
-        // positive case
-        create_valid_env();
+        // positive cases
+        let settings = create_valid_env();
+
+        // Test timeout
+        settings.layer.to_owned().unwrap().create_timeout_layer();
+
+        // Test CORS
+        if settings
+            .layer
+            .to_owned()
+            .unwrap()
+            .try_create_cors_layer()
+            .unwrap()
+            .is_none()
+        {
+            panic!("expected valid CorsLayer");
+        }
+
+        // Test listener
+        if SocketAddr::try_from(&settings.listener.to_owned().unwrap()).is_err() {
+            panic!("expected valid listener SocketAddr");
+        }
+
+        // Test MetricsDB
+        let _ = Client::from(&settings.metricsdb.to_owned().unwrap());
+
+        // Test tracing - Commented out because this can only be called once
+        // and is covered by an existing test in the tracing module.
+        // settings.tracing.try_init_tracing_subscriber().unwrap();
+
         // negative case
         assert_eq!(
             CommonSettings::try_new_from_env("INVALID_APP_NAME").unwrap_err(),
@@ -73,7 +105,7 @@ pub(crate) mod tests {
 
     /// For Testing Only - self-contained method for establishing test settings
     /// and performing cleanup
-    pub(crate) fn create_valid_env() -> CommonSettings {
+    fn create_valid_env() -> CommonSettings {
         let app_name = setup_valid_test_env();
         let settings = CommonSettings::try_new_from_env(&app_name).unwrap();
         cleanup_test_env(&app_name);
@@ -86,7 +118,7 @@ pub(crate) mod tests {
     /// String that is the APP_NAME that should be used for the test as well
     /// as what must be passed to properly clean up.
     /// Must be followed by cleanup_test_env()
-    pub(crate) fn setup_valid_test_env() -> String {
+    fn setup_valid_test_env() -> String {
         let app_name = Uuid::now_v7().to_string();
         for (pre, post, val) in VALID_SETTINGS_ARR {
             let key = format!("{}_{}_{}", app_name, pre, post);
@@ -97,7 +129,7 @@ pub(crate) mod tests {
     }
 
     /// For Testing Only - cleans up ENV variables for local test
-    pub(crate) fn cleanup_test_env(app_name: &str) {
+    fn cleanup_test_env(app_name: &str) {
         for (pre, post, _) in VALID_SETTINGS_ARR {
             remove_var(format!("{}_{}_{}", app_name, pre, post));
         }

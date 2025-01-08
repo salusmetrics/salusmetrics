@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn Error + 'static>> {
     env_settings.tracing.try_init_tracing_subscriber()?;
     let state: CommonAppState = (&env_settings).try_into()?;
 
-    let layer_settings = conf::layer::LayerSettings::try_new(APP_NAME)?;
+    let layer_settings = env_settings.layer.ok_or(ConfError::Layer)?;
     let cors_layer = layer_settings
         .try_create_cors_layer()?
         .ok_or(ConfError::Cors)?

@@ -3,27 +3,36 @@ use std::time::Duration;
 use http::HeaderValue;
 use serde::{Deserialize, Serialize};
 use tower_http::{cors::CorsLayer, timeout::TimeoutLayer};
+use tracing::instrument;
 
-use crate::{conf_error::ConfError, settings::CommonSettings};
+use crate::conf_error::ConfError;
 
 pub const DEFAULT_TIMEOUT_MILLIS: u64 = 30000;
 
-/// Axum settings for the CorsLayer type that can be common across app types
-/// If none specified then no CorsLayer will be created
+/// `CorsSettings` represents axum settings for the `CorsLayer` type that is
+/// common across app metrics apps. Not all apps require CORS, in which case
+/// this setting should not be specified in ENV.
+///
+/// `origins` is required and must not be empty for the CORS layer to be used
+///
+/// `max_age_secs` represents the number of seconds allowed between an Options
+/// request from the browser and any other method. This is not required and
+/// will fall back to the default of zero for the system, which means that
+/// every individual request must perform an options handshake.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct CorsSettings {
     pub max_age_secs: Option<u64>,
     pub origins: Vec<String>,
 }
 
-impl CorsSettings {
-    /// Attempt to created a CORS layer from ENV values. If no CORS ENV values
-    /// are provided, then there will not be a CorsLayer created.
-    pub fn try_create_cors_layer(&self) -> Result<CorsLayer, ConfError> {
+impl TryFrom<&CorsSettings> for CorsLayer {
+    type Error = ConfError;
+    #[instrument]
+    fn try_from(value: &CorsSettings) -> Result<Self, Self::Error> {
         let CorsSettings {
             max_age_secs,
             origins,
-        } = self.to_owned();
+        } = value.to_owned();
 
         if origins.is_empty() {
             tracing::error!("Empty list of CORS allowed origins specified");
@@ -48,8 +57,9 @@ impl CorsSettings {
     }
 }
 
-/// Axum settings for the TimeoutLayer type that can be common across app types
-/// If none is specified, then default value will be used
+/// `TimeoutSettings` allows the customization of a given app's TimeoutLayer
+/// which determines how long the server will wait before responding with a
+/// timeout. If none is specified, then default value will be used
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TimeoutSettings {
     pub millis: u64,
@@ -63,14 +73,15 @@ impl Default for TimeoutSettings {
     }
 }
 
-impl TimeoutSettings {
-    /// create an Axum TimeoutLayer with the specified timeout in milliseconds
-    pub fn create_timeout_layer(&self) -> TimeoutLayer {
-        TimeoutLayer::new(Duration::from_millis(self.millis))
+impl From<&TimeoutSettings> for TimeoutLayer {
+    fn from(value: &TimeoutSettings) -> Self {
+        TimeoutLayer::new(Duration::from_millis(value.millis))
     }
 }
 
-/// Collection of the settings types for Axum Layers that are common across apps
+/// `LayerSettings` wraps the `CorsSettings` and `TimeoutSettings` into a
+/// common struct which can be used to handle both in a clean manner
+/// which will optionally set up a CORS layer if any is specified.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct LayerSettings {
     pub cors: Option<CorsSettings>,
@@ -87,83 +98,103 @@ impl Default for LayerSettings {
 }
 
 impl LayerSettings {
-    pub fn try_new(app_name: &str) -> Result<Self, ConfError> {
-        assert!(!app_name.is_empty());
-        Ok(CommonSettings::try_new_from_env(app_name)?
-            .layer
-            .unwrap_or_default())
-    }
-
-    /// Returns an Axum TimeoutLayer that will use ENV values for the timeout in millis.
-    /// If no value is provided in the ENV, then the default will be used
+    /// Return an axum `TimeoutLayer` that reflects the vakues of the
+    /// TimeoutSettings field or else falls back to the default value.
     pub fn create_timeout_layer(&self) -> TimeoutLayer {
-        self.timeout
-            .to_owned()
-            .unwrap_or_default()
-            .create_timeout_layer()
+        TimeoutLayer::from(&self.timeout.to_owned().unwrap_or_default())
     }
 
-    /// Attempt to created a CORS layer from ENV values. If no CORS ENV values
-    /// are provided, then there will not be a CorsLayer created.
+    /// Attempt to create an axum `CorsLayer` if one is spefified, otherwise
+    /// returns None. In order to be a valid setup, the list of origins must
+    /// not be empty. If no max_age_secs is specified, then the axum default
+    /// will be used, which causes all requests to start with a handshake
     pub fn try_create_cors_layer(&self) -> Result<Option<CorsLayer>, ConfError> {
-        match self.to_owned().cors {
+        match self.cors.to_owned() {
             None => Ok(None),
-            Some(cors) => Ok(Some(cors.try_create_cors_layer()?)),
+            Some(cors) => Ok(Some(CorsLayer::try_from(&cors)?)),
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        conf_error::ConfError,
-        settings::{
-            tests::{cleanup_test_env, create_valid_env, setup_valid_test_env},
-            CommonSettings,
-        },
-    };
+    use tower_http::{cors::CorsLayer, timeout::TimeoutLayer};
 
-    use super::CorsSettings;
+    use crate::conf_error::ConfError;
+
+    use super::{CorsSettings, LayerSettings, TimeoutSettings};
 
     #[test]
-    fn test_try_new_layer_settings() {
+    fn test_timeout_settings() {
         // Positive test case
-        let app_name = setup_valid_test_env();
-        let _ = CommonSettings::try_new_from_env(&app_name)
-            .unwrap()
-            .layer
-            .unwrap();
-        cleanup_test_env(&app_name);
+        let test_settings = TimeoutSettings { millis: 60000 };
+        let _ = TimeoutLayer::from(&test_settings);
+    }
+
+    #[test]
+    fn test_cors_settings() {
+        // Positive test case
+        let valid_no_max_settings = CorsSettings {
+            origins: vec!["http://localhost:3000".to_owned()],
+            max_age_secs: None,
+        };
+        let _ = CorsLayer::try_from(&valid_no_max_settings).unwrap();
+        let valid_with_max_settings = CorsSettings {
+            origins: vec!["http://localhost:3000".to_owned()],
+            max_age_secs: Some(10),
+        };
+        let _ = CorsLayer::try_from(&valid_with_max_settings).unwrap();
+
+        // Negative test case
+        let invalid_settings = CorsSettings {
+            origins: vec![],
+            max_age_secs: None,
+        };
+        assert_eq!(
+            CorsLayer::try_from(&invalid_settings).unwrap_err(),
+            ConfError::Cors
+        );
     }
 
     #[test]
     fn test_create_timeout_layer() {
-        let _ = create_valid_env().layer.unwrap().create_timeout_layer();
+        let default_settings = LayerSettings::default();
+        let _ = default_settings.create_timeout_layer();
+
+        let specified_timeout = LayerSettings {
+            cors: None,
+            timeout: Some(TimeoutSettings { millis: 500 }),
+        };
+        specified_timeout.create_timeout_layer();
     }
 
     #[test]
     fn test_try_create_cors_layer() {
-        let valid_thin_settings = CorsSettings {
-            max_age_secs: None,
-            origins: vec![
-                "https://test.com".to_owned(),
-                "http://localhost:3000".to_owned(),
-            ],
+        // Default case should succeed, but with no CorsLayer returned
+        let default_settings = LayerSettings::default();
+        if default_settings.try_create_cors_layer().unwrap().is_some() {
+            panic!("expected None");
         };
-        let _ = valid_thin_settings.try_create_cors_layer().unwrap();
 
-        let valid_full_settings = CorsSettings {
-            max_age_secs: Some(60),
-            origins: vec![
-                "https://test.com".to_owned(),
-                "http://localhost:3000".to_owned(),
-            ],
+        // Create a valid CorsLayer
+        let valid_settings = LayerSettings {
+            timeout: None,
+            cors: Some(CorsSettings {
+                max_age_secs: None,
+                origins: vec!["http://127.0.0.1:9000".to_owned()],
+            }),
         };
-        let _ = valid_full_settings.try_create_cors_layer().unwrap();
+        if valid_settings.try_create_cors_layer().unwrap().is_none() {
+            panic!("expected valid CorsLayer to be created");
+        }
 
-        let invalid_settings = CorsSettings {
-            max_age_secs: Some(60),
-            origins: Vec::new(),
+        // Invalid CorsSettings
+        let invalid_settings = LayerSettings {
+            timeout: None,
+            cors: Some(CorsSettings {
+                max_age_secs: None,
+                origins: vec![],
+            }),
         };
         assert_eq!(
             invalid_settings.try_create_cors_layer().unwrap_err(),
