@@ -7,7 +7,7 @@ use conf::settings::CommonSettings;
 use conf::state::CommonAppState;
 use http::Method;
 use hyper::{HeaderMap, StatusCode};
-use ingest::client_event::{ClientEvent, ClientEventType, EventHeaders};
+use ingest::client_event::{ClientEvent, ClientEventBody, ClientEventType, EventHeaders};
 use ingest::event_record::EventRecord;
 use std::error::Error;
 use tower_http::cors::Any;
@@ -61,13 +61,13 @@ async fn main() -> Result<(), Box<dyn Error + 'static>> {
 async fn test_ingest(
     State(app_state): State<CommonAppState>,
     headers: HeaderMap,
-    Json(event): Json<ClientEvent>,
+    Json(event): Json<ClientEventBody>,
 ) -> impl IntoResponse {
     let Ok(event_headers) = EventHeaders::try_from(&headers) else {
         return StatusCode::BAD_REQUEST;
     };
-    let for_insert =
-        EventRecord::try_from_client_event(event, event_headers.api_key, event_headers.site);
+    let event = ClientEvent::new(&event_headers, &event);
+    let for_insert = EventRecord::try_from(event);
 
     let Ok(record) = for_insert else {
         return StatusCode::BAD_REQUEST;
@@ -90,11 +90,8 @@ async fn test_ingest(
 
 #[instrument]
 async fn explore() -> impl IntoResponse {
-    let valid_ingest_event = ClientEvent {
-        event_type: ClientEventType::Visitor,
-        id: Uuid::now_v7(),
-        attrs: Some(Vec::new()),
-    };
+    let valid_ingest_event =
+        ClientEventBody::new(ClientEventType::Visitor, Uuid::now_v7(), Some(Vec::new()));
 
     (StatusCode::OK, Json(valid_ingest_event))
 }

@@ -50,33 +50,6 @@ impl From<ClientEventType> for EventRecordType {
 }
 
 impl EventRecord {
-    /// Attempt to create an EventRecord from a given ClientEvent and site.
-    ///
-    /// The event timestamp is determined by evaluating the UUID for a time.
-    /// This will error in cases where the UUID is not of type v7 and also if
-    /// the time for the event derived from the UUID is not within the bounds
-    /// of now - MAX_DURATION_BEFORE_PRESENT and now + MAX_DURATION_BEFORE_PRESENT
-    #[instrument]
-    pub fn try_from_client_event(
-        value: ClientEvent,
-        api_key: ApiKey,
-        site: Site,
-    ) -> Result<Self, IngestError> {
-        // Determine if the UUID is a proper v7 and if the date is close to now
-
-        let uuid_datetime = try_uuid_datetime(&value.id)
-            .inspect_err(|e| tracing::warn!("error converting UUID to datetime: {e}"))?;
-        let verified_datetime = Self::verify_datetime_range(uuid_datetime)?;
-        Ok(EventRecord {
-            api_key,
-            site,
-            event_type: value.event_type.into(),
-            id: value.id,
-            ts: verified_datetime,
-            attrs: value.attrs.unwrap_or_default(),
-        })
-    }
-
     /// Function to check whether the submitted even has a timestamp which falls
     /// within the max and min duration from now
     ///
@@ -94,6 +67,31 @@ impl EventRecord {
         } else {
             Ok(datetime)
         }
+    }
+}
+
+impl TryFrom<ClientEvent> for EventRecord {
+    type Error = IngestError;
+    /// Attempt to create an EventRecord from a given `ClientEvent`
+    ///
+    /// The event timestamp is determined by evaluating the UUID for a time.
+    /// This will error in cases where the UUID is not of type v7 and also if
+    /// the time for the event derived from the UUID is not within the bounds
+    /// of now - MAX_DURATION_BEFORE_PRESENT and now + MAX_DURATION_BEFORE_PRESENT
+    #[instrument]
+    fn try_from(event: ClientEvent) -> Result<Self, IngestError> {
+        // Determine if the UUID is a proper v7 and if the date is close to now
+        let uuid_datetime = try_uuid_datetime(&event.id())
+            .inspect_err(|e| tracing::warn!("error converting UUID to datetime: {e}"))?;
+        let verified_datetime = Self::verify_datetime_range(uuid_datetime)?;
+        Ok(EventRecord {
+            api_key: event.api_key(),
+            site: event.site(),
+            event_type: event.event_type().into(),
+            id: event.id(),
+            ts: verified_datetime,
+            attrs: event.attrs().unwrap_or_default(),
+        })
     }
 }
 
@@ -170,6 +168,8 @@ mod tests {
         let uuid_now = Uuid::now_v7();
         let (ts_now, _) = uuid_now.get_timestamp().unwrap().to_unix();
         let valid_ingest_event = ClientEvent {
+            api_key: ApiKey(API_KEY_STR.to_owned()),
+            site: Site(SITE.to_owned()),
             event_type: ClientEventType::Visitor,
             id: uuid_now,
             attrs: Some(Vec::new()),
@@ -190,37 +190,17 @@ mod tests {
             ..valid_ingest_event.clone()
         };
 
-        EventRecord::try_from_client_event(
-            valid_ingest_event,
-            ApiKey(API_KEY_STR.to_string()),
-            Site(SITE.to_string()),
-        )
-        .unwrap();
+        EventRecord::try_from(valid_ingest_event).unwrap();
         assert_eq!(
-            EventRecord::try_from_client_event(
-                invalid_ingest_event_type,
-                ApiKey(API_KEY_STR.to_string()),
-                Site(SITE.to_string()),
-            )
-            .unwrap_err(),
+            EventRecord::try_from(invalid_ingest_event_type).unwrap_err(),
             IngestError::UuidVersion
         );
         assert_eq!(
-            EventRecord::try_from_client_event(
-                invalid_ingest_event_early,
-                ApiKey(API_KEY_STR.to_string()),
-                Site(SITE.to_string()),
-            )
-            .unwrap_err(),
+            EventRecord::try_from(invalid_ingest_event_early).unwrap_err(),
             IngestError::TimestampOutOfRange
         );
         assert_eq!(
-            EventRecord::try_from_client_event(
-                invalid_ingest_event_late,
-                ApiKey(API_KEY_STR.to_string()),
-                Site(SITE.to_string()),
-            )
-            .unwrap_err(),
+            EventRecord::try_from(invalid_ingest_event_late).unwrap_err(),
             IngestError::TimestampOutOfRange
         );
     }
