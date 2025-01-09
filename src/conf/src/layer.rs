@@ -9,6 +9,28 @@ use crate::conf_error::ConfError;
 
 pub const DEFAULT_TIMEOUT_MILLIS: u64 = 30000;
 
+/// `CompressionSettings` allows the setup of `tower-http` `CompressionLayer`
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct CompressionSettings {
+    gzip: bool,
+}
+
+impl From<&CompressionSettings> for CompressionLayer {
+    fn from(value: &CompressionSettings) -> Self {
+        if value.gzip {
+            CompressionLayer::new().gzip(true).deflate(true)
+        } else {
+            CompressionLayer::new()
+        }
+    }
+}
+
+impl Default for CompressionSettings {
+    fn default() -> Self {
+        Self { gzip: true }
+    }
+}
+
 /// `CorsSettings` represents axum settings for the `CorsLayer` type that is
 /// common across app metrics apps. Not all apps require CORS, in which case
 /// this setting should not be specified in ENV.
@@ -65,28 +87,6 @@ impl TryFrom<&CorsSettings> for CorsLayer {
         }
 
         Ok(layer)
-    }
-}
-
-/// `CompressionSettings` allows the setup of `tower-http` `CompressionLayer`
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct CompressionSettings {
-    gzip: bool,
-}
-
-impl From<&CompressionSettings> for CompressionLayer {
-    fn from(value: &CompressionSettings) -> Self {
-        if value.gzip {
-            CompressionLayer::new().gzip(true).deflate(true)
-        } else {
-            CompressionLayer::new()
-        }
-    }
-}
-
-impl Default for CompressionSettings {
-    fn default() -> Self {
-        Self { gzip: true }
     }
 }
 

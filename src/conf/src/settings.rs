@@ -117,6 +117,7 @@ pub(crate) mod tests {
 
     use super::CommonSettings;
     const VALID_SETTINGS_ARR: &[(&str, &str, &str)] = &[
+        ("LAYER", "COMPRESSION_GZIP", "true"),
         (
             "LAYER",
             "CORS_ORIGINS",
@@ -138,8 +139,18 @@ pub(crate) mod tests {
         // positive cases
         let settings = create_valid_env();
 
+        // Test compression
+        if settings
+            .layer()
+            .unwrap()
+            .try_create_compression_layer()
+            .is_none()
+        {
+            panic!("Expected compression layer to be created");
+        }
+
         // Test timeout
-        settings.layer.to_owned().unwrap().create_timeout_layer();
+        settings.layer().unwrap().create_timeout_layer();
 
         // Test CORS
         if settings
