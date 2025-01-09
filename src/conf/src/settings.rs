@@ -183,7 +183,7 @@ pub(crate) mod tests {
         );
     }
 
-    /// For Testing Only - self-contained method for establishing test settings
+    /// Self-contained method for establishing test settings
     /// and performing cleanup
     fn create_valid_env() -> CommonSettings {
         let app_name = setup_valid_test_env();
@@ -194,7 +194,7 @@ pub(crate) mod tests {
         settings
     }
 
-    /// For Testing Only - sets ENV variables for a valid local test. Returns
+    /// Sets ENV variables for a valid local test. Returns
     /// String that is the APP_NAME that should be used for the test as well
     /// as what must be passed to properly clean up.
     /// Must be followed by cleanup_test_env()
