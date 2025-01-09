@@ -183,9 +183,48 @@ impl TryFrom<&HeaderMap> for EventHeaders {
                 .get("api-key")
                 .ok_or(IngestError::ApiKey)?
                 .to_str()
-                .map_err(|_| IngestError::Site)?
+                .map_err(|_| IngestError::ApiKey)?
                 .to_string(),
         );
         Ok(EventHeaders { api_key, site })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use http::{header, HeaderMap};
+
+    use crate::ingest_error::IngestError;
+
+    use super::EventHeaders;
+
+    #[test]
+    fn test_from_header_map() {
+        // Positive test case
+        let mut valid_headers = HeaderMap::new();
+        valid_headers.insert(header::REFERER, "http://test.com/test/dir".parse().unwrap());
+        valid_headers.insert("api-key", "1234-5678-90".parse().unwrap());
+
+        if EventHeaders::try_from(&valid_headers).is_err() {
+            println!("headers: {:?}", valid_headers);
+            panic!("Expected valid EventHeaders for valid HeaderMap");
+        }
+
+        // Negative test cases
+        let mut invalid_referer = HeaderMap::new();
+        invalid_referer.insert("api-key", "1234-5678-90".parse().unwrap());
+        assert_eq!(
+            EventHeaders::try_from(&invalid_referer).unwrap_err(),
+            IngestError::Site,
+            "Should fail with no valid refere"
+        );
+
+        let mut invalid_api_key = HeaderMap::new();
+        invalid_api_key.insert(header::REFERER, "http://test.com/test/dir".parse().unwrap());
+        assert_eq!(
+            EventHeaders::try_from(&invalid_api_key).unwrap_err(),
+            IngestError::ApiKey,
+            "Should fail with no valid refere"
+        );
     }
 }
