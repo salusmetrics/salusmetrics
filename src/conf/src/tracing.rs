@@ -7,7 +7,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 /// be passed along to `EnvFilter::try_new`.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct TracingSettings {
-    pub directive: String,
+    directive: String,
 }
 
 impl Default for TracingSettings {
@@ -26,6 +26,13 @@ impl TryInto<EnvFilter> for &TracingSettings {
 }
 
 impl TracingSettings {
+    /// Constructor for `TracingSettings`
+    pub fn new(directive: impl AsRef<str>) -> Self {
+        Self {
+            directive: directive.as_ref().to_owned(),
+        }
+    }
+
     /// Attempt to initialize the tracing subscriber based on settings
     pub fn try_init_tracing_subscriber(&self) -> Result<(), ConfError> {
         let filter_layer: EnvFilter = self.try_into()?;

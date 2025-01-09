@@ -8,13 +8,33 @@ use serde::{Deserialize, Serialize};
 /// Settings struct that is common between different apps that make up salus metrics
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
 pub struct CommonSettings {
-    pub layer: Option<LayerSettings>,
-    pub listener: Option<ListenerSettings>,
-    pub metricsdb: Option<MetricsDatabaseSettings>,
-    pub tracing: TracingSettings,
+    layer: Option<LayerSettings>,
+    listener: Option<ListenerSettings>,
+    metricsdb: Option<MetricsDatabaseSettings>,
+    tracing: TracingSettings,
 }
 
 impl CommonSettings {
+    /// Getter for `LayerSettings`
+    pub fn layer(&self) -> Option<LayerSettings> {
+        self.layer.to_owned()
+    }
+
+    /// Getter for `ListenerSettings`
+    pub fn listener(&self) -> Option<ListenerSettings> {
+        self.listener.to_owned()
+    }
+
+    /// Getter for `MetricsDatabaseSettings`
+    pub fn metricsdb(&self) -> Option<MetricsDatabaseSettings> {
+        self.metricsdb.to_owned()
+    }
+
+    /// Getter for `TracingSettings`
+    pub fn tracing(&self) -> TracingSettings {
+        self.tracing.to_owned()
+    }
+
     /// Attempt to create a CommonSettings from the ENV for the specified app.
     /// app_name will be used as the prefix for all settings for this app.
     pub fn try_new_from_env(app_name: impl AsRef<str>) -> Result<Self, ConfError> {
@@ -32,6 +52,55 @@ impl CommonSettings {
             .map_err(|_| ConfError::Env)?
             .try_deserialize()
             .map_err(|_| ConfError::Env)
+    }
+}
+
+/// `CommonSettingsBuilder` implements the builder pattern for `CommonSettings`
+#[derive(Default)]
+pub struct CommonSettingsBuilder {
+    layer: Option<LayerSettings>,
+    listener: Option<ListenerSettings>,
+    metricsdb: Option<MetricsDatabaseSettings>,
+    tracing: TracingSettings,
+}
+
+impl CommonSettingsBuilder {
+    /// `CommonSettingsBuilder` constructor
+    pub fn new() -> Self {
+        CommonSettingsBuilder::default()
+    }
+
+    /// Set the `LayerSettings` for this builder
+    pub fn layer(mut self, layer_settings: LayerSettings) -> Self {
+        self.layer = Some(layer_settings);
+        self
+    }
+
+    /// Set the `ListenerSettings` for this builder
+    pub fn listener(mut self, listener_settings: ListenerSettings) -> Self {
+        self.listener = Some(listener_settings);
+        self
+    }
+
+    /// Set the `MetricsDatabaseSettings` for this builder
+    pub fn metricsdb(mut self, metricsdb_settings: MetricsDatabaseSettings) -> Self {
+        self.metricsdb = Some(metricsdb_settings);
+        self
+    }
+
+    /// Set the `TracingSettings` for this builder
+    pub fn tracing(mut self, tracing_settings: TracingSettings) -> Self {
+        self.tracing = tracing_settings;
+        self
+    }
+
+    pub fn build(self) -> CommonSettings {
+        CommonSettings {
+            layer: self.layer,
+            listener: self.listener,
+            metricsdb: self.metricsdb,
+            tracing: self.tracing,
+        }
     }
 }
 

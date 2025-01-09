@@ -5,10 +5,26 @@ use serde::{Deserialize, Serialize};
 /// to the Clickhouse database instance in which metrics data is being recorded
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct MetricsDatabaseSettings {
-    pub url: String,
-    pub database: String,
-    pub user: String,
-    pub pass: String,
+    url: String,
+    database: String,
+    user: String,
+    pass: String,
+}
+
+impl MetricsDatabaseSettings {
+    pub fn new(
+        url: impl AsRef<str>,
+        database: impl AsRef<str>,
+        user: impl AsRef<str>,
+        pass: impl AsRef<str>,
+    ) -> Self {
+        Self {
+            url: url.as_ref().to_owned(),
+            database: database.as_ref().to_owned(),
+            user: user.as_ref().to_owned(),
+            pass: pass.as_ref().to_owned(),
+        }
+    }
 }
 
 impl From<&MetricsDatabaseSettings> for Client {

@@ -14,7 +14,7 @@ pub struct CommonAppState {
 impl TryFrom<&CommonSettings> for CommonAppState {
     type Error = ConfError;
     fn try_from(value: &CommonSettings) -> Result<Self, Self::Error> {
-        let metrics_settings = value.metricsdb.to_owned().ok_or(ConfError::MetricsDb)?;
+        let metrics_settings = value.metricsdb().ok_or(ConfError::MetricsDb)?;
 
         Ok(CommonAppState {
             metrics_db_client: Client::from(&metrics_settings),
@@ -24,22 +24,21 @@ impl TryFrom<&CommonSettings> for CommonAppState {
 
 #[cfg(test)]
 mod tests {
-    use crate::{metrics_database::MetricsDatabaseSettings, settings::CommonSettings};
+    use crate::{metrics_database::MetricsDatabaseSettings, settings::CommonSettingsBuilder};
 
     use super::CommonAppState;
 
     #[test]
     fn test_try_from() {
         //positive test case
-        let valid_settings = CommonSettings {
-            metricsdb: Some(MetricsDatabaseSettings {
-                database: "METRICS_DB".to_owned(),
-                pass: "pass".to_owned(),
-                url: "http://localhost:8123".to_owned(),
-                user: "user".to_owned(),
-            }),
-            ..Default::default()
-        };
+        let valid_settings = CommonSettingsBuilder::new()
+            .metricsdb(MetricsDatabaseSettings::new(
+                "http://localhost:8123",
+                "METRICS_DB",
+                "user",
+                "pass",
+            ))
+            .build();
         let _ = CommonAppState::try_from(&valid_settings).unwrap();
     }
 }

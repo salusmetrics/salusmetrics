@@ -11,7 +11,7 @@ use ingest::client_event::{ClientEvent, ClientEventType, EventHeaders};
 use ingest::event_record::EventRecord;
 use std::error::Error;
 use tower_http::cors::Any;
-use tower_http::{compression::CompressionLayer, trace::TraceLayer};
+use tower_http::trace::TraceLayer;
 use tracing::instrument;
 use uuid::Uuid;
 
@@ -21,27 +21,31 @@ pub const APP_NAME: &str = "SALUS_INGEST";
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + 'static>> {
     let env_settings = CommonSettings::try_new_from_env(APP_NAME)?;
-    env_settings.tracing.try_init_tracing_subscriber()?;
-    let state: CommonAppState = (&env_settings).try_into()?;
+    env_settings.tracing().try_init_tracing_subscriber()?;
 
-    let layer_settings = env_settings.layer.ok_or(ConfError::Layer)?;
+    let layer_settings = env_settings.layer().ok_or(ConfError::Layer)?;
     let cors_layer = layer_settings
         .try_create_cors_layer()?
         .ok_or(ConfError::Cors)?
         .allow_methods([Method::POST])
         .allow_headers(Any);
 
-    let app = Router::new()
+    let state = CommonAppState::try_from(&env_settings)?;
+
+    let mut app = Router::new()
         .route("/explore", get(explore))
         .route("/ingest", post(test_ingest))
         .layer(TraceLayer::new_for_http())
         .layer(cors_layer)
-        .layer(CompressionLayer::new().gzip(true).deflate(true))
         .layer(layer_settings.create_timeout_layer())
         .with_state(state);
 
+    if let Some(compression_layer) = layer_settings.try_create_compression_layer() {
+        app = app.layer(compression_layer);
+    }
+
     let listener = env_settings
-        .listener
+        .listener()
         .ok_or(ConfError::Listener)?
         .try_new_listener()
         .await?;

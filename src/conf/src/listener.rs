@@ -10,9 +10,9 @@ use crate::conf_error::ConfError;
 /// (exclusive) should be attached to as well as the port.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ListenerSettings {
-    pub port: u16,
-    pub ipv4: Option<Ipv4Addr>,
-    pub ipv6: Option<Ipv6Addr>,
+    port: u16,
+    ipv4: Option<Ipv4Addr>,
+    ipv6: Option<Ipv6Addr>,
 }
 
 impl TryFrom<&ListenerSettings> for SocketAddr {
@@ -33,6 +33,33 @@ impl TryFrom<&ListenerSettings> for SocketAddr {
 }
 
 impl ListenerSettings {
+    /// Port only constructor for `ListenerSettings`
+    pub fn new_with_port(port: u16) -> Self {
+        Self {
+            port,
+            ipv4: None,
+            ipv6: None,
+        }
+    }
+
+    /// IPv4 constructor
+    pub fn new_ipv4(ipv4: Ipv4Addr, port: u16) -> Self {
+        Self {
+            port,
+            ipv4: Some(ipv4),
+            ipv6: None,
+        }
+    }
+
+    /// IPv6 constructor
+    pub fn new_ipv6(ipv6: Ipv6Addr, port: u16) -> Self {
+        Self {
+            port,
+            ipv4: None,
+            ipv6: Some(ipv6),
+        }
+    }
+
     /// Attempt to bind a listener to the specified IP and port for this
     /// `ListenerSettings` struct
     #[instrument]
