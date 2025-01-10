@@ -2,7 +2,6 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use clickhouse::insert::Insert;
 use conf::conf_error::ConfError;
 use conf::settings::CommonSettings;
 use conf::state::CommonAppState;
@@ -71,7 +70,7 @@ async fn test_multi_ingest(
 
     let events: Vec<ClientEvent> = event_bodies
         .iter()
-        .map(|eb| ClientEvent::new(&event_headers, eb))
+        .map(|eb| ClientEvent::new_from_headers_body(&event_headers, eb))
         .collect();
     let mut event_records: Vec<EventRecord> = Vec::with_capacity(events.len());
     for ev in events.iter() {
@@ -106,7 +105,7 @@ async fn test_ingest(
     let Ok(event_headers) = EventHeaders::try_from(&headers) else {
         return StatusCode::BAD_REQUEST;
     };
-    let event = ClientEvent::new(&event_headers, &event);
+    let event = ClientEvent::new_from_headers_body(&event_headers, &event);
     let for_insert = EventRecord::try_from(&event);
 
     let Ok(record) = for_insert else {

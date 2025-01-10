@@ -11,17 +11,34 @@ use crate::ingest_error::IngestError;
 /// header-derived information and event-specific fields from the body
 #[derive(Debug, Clone)]
 pub struct ClientEvent {
-    pub api_key: ApiKey,
-    pub site: Site,
-    pub event_type: ClientEventType,
-    pub id: Uuid,
-    pub attrs: Option<Vec<(String, String)>>,
+    api_key: ApiKey,
+    site: Site,
+    event_type: ClientEventType,
+    id: Uuid,
+    attrs: Option<Vec<(String, String)>>,
 }
 
 impl ClientEvent {
+    /// `ClientEvent` constructor from all parts
+    pub fn new(
+        api_key: ApiKey,
+        site: Site,
+        event_type: ClientEventType,
+        id: Uuid,
+        attrs: Option<Vec<(String, String)>>,
+    ) -> Self {
+        Self {
+            api_key,
+            site,
+            event_type,
+            id,
+            attrs,
+        }
+    }
+
     /// `ClientEvent` constructor from the request `EventHeaders` and specific
     /// event `ClientEventBody`
-    pub fn new(headers: &EventHeaders, body: &ClientEventBody) -> Self {
+    pub fn new_from_headers_body(headers: &EventHeaders, body: &ClientEventBody) -> Self {
         Self {
             api_key: headers.api_key(),
             site: headers.site(),

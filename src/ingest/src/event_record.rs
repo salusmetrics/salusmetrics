@@ -13,6 +13,7 @@ pub const MAX_DURATION_BEFORE_PRESENT: Duration = Duration::HOUR;
 pub const MAX_DURATION_AFTER_PRESENT: Duration = Duration::minutes(5);
 
 /// Type of analytics event - maps to ClickHouse Enum8 with identical values
+/// See definition of table `SALUS_METRICS.EVENT` and field `event_type`
 #[derive(Debug, Deserialize_repr, PartialEq, Eq, PartialOrd, Ord, Serialize_repr, Clone)]
 #[repr(u8)]
 pub enum EventRecordType {
@@ -125,6 +126,35 @@ mod tests {
     const API_KEY_STR: &str = "123_456_789";
     const SITE: &str = "test.com";
 
+    /// This is very important in order to keep the mapping in ClickHouse in
+    /// line with this library
+    #[test]
+    fn test_event_record_type_discriminant() {
+        let visitor_discriminant = EventRecordType::Visitor as u32;
+        assert_eq!(
+            visitor_discriminant, 1,
+            "EventRecordType::Visitor discriminant does not match expected value"
+        );
+
+        let session_discriminant = EventRecordType::Session as u32;
+        assert_eq!(
+            session_discriminant, 2,
+            "EventRecordType::Session discriminant does not match expected value"
+        );
+
+        let section_discriminant = EventRecordType::Section as u32;
+        assert_eq!(
+            section_discriminant, 3,
+            "EventRecordType::Section discriminant does not match expected value"
+        );
+
+        let click_discriminant = EventRecordType::Click as u32;
+        assert_eq!(
+            click_discriminant, 4,
+            "EventRecordType::Click discriminant does not match expected value"
+        );
+    }
+
     #[test]
     fn test_try_uuid_datetime() {
         //  Test a valid case with a v7 UUID from now
@@ -167,28 +197,37 @@ mod tests {
     fn test_try_from_client_event() {
         let uuid_now = Uuid::now_v7();
         let (ts_now, _) = uuid_now.get_timestamp().unwrap().to_unix();
-        let valid_ingest_event = ClientEvent {
-            api_key: ApiKey(API_KEY_STR.to_owned()),
-            site: Site(SITE.to_owned()),
-            event_type: ClientEventType::Visitor,
-            id: uuid_now,
-            attrs: Some(Vec::new()),
-        };
+        let valid_ingest_event = ClientEvent::new(
+            ApiKey(API_KEY_STR.to_owned()),
+            Site(SITE.to_owned()),
+            ClientEventType::Visitor,
+            uuid_now,
+            Some(Vec::new()),
+        );
 
-        let invalid_ingest_event_type = ClientEvent {
-            id: Uuid::parse_str(UUID_V4_STR).unwrap(),
-            ..valid_ingest_event.clone()
-        };
+        let invalid_ingest_event_type = ClientEvent::new(
+            ApiKey(API_KEY_STR.to_owned()),
+            Site(SITE.to_owned()),
+            ClientEventType::Visitor,
+            Uuid::parse_str(UUID_V4_STR).unwrap(),
+            Some(Vec::new()),
+        );
 
-        let invalid_ingest_event_early = ClientEvent {
-            id: Uuid::new_v7(Timestamp::from_unix_time(ts_now - 3601, 0, 0, 8)),
-            ..valid_ingest_event.clone()
-        };
+        let invalid_ingest_event_early = ClientEvent::new(
+            ApiKey(API_KEY_STR.to_owned()),
+            Site(SITE.to_owned()),
+            ClientEventType::Visitor,
+            Uuid::new_v7(Timestamp::from_unix_time(ts_now - 3601, 0, 0, 8)),
+            Some(Vec::new()),
+        );
 
-        let invalid_ingest_event_late = ClientEvent {
-            id: Uuid::new_v7(Timestamp::from_unix_time(ts_now + 301, 0, 0, 8)),
-            ..valid_ingest_event.clone()
-        };
+        let invalid_ingest_event_late = ClientEvent::new(
+            ApiKey(API_KEY_STR.to_owned()),
+            Site(SITE.to_owned()),
+            ClientEventType::Visitor,
+            Uuid::new_v7(Timestamp::from_unix_time(ts_now + 301, 0, 0, 8)),
+            Some(Vec::new()),
+        );
 
         EventRecord::try_from(&valid_ingest_event).unwrap();
         assert_eq!(
