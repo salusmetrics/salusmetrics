@@ -19,7 +19,7 @@ pub enum EventRecordType {
     Visitor = 1,
     Session = 2,
     Section = 3,
-    Click = 5,
+    Click = 4,
 }
 
 /// Represents the data that will actually be inserted into ClickHouse in the
@@ -70,7 +70,7 @@ impl EventRecord {
     }
 }
 
-impl TryFrom<ClientEvent> for EventRecord {
+impl TryFrom<&ClientEvent> for EventRecord {
     type Error = IngestError;
     /// Attempt to create an EventRecord from a given `ClientEvent`
     ///
@@ -79,7 +79,7 @@ impl TryFrom<ClientEvent> for EventRecord {
     /// the time for the event derived from the UUID is not within the bounds
     /// of now - MAX_DURATION_BEFORE_PRESENT and now + MAX_DURATION_BEFORE_PRESENT
     #[instrument]
-    fn try_from(event: ClientEvent) -> Result<Self, IngestError> {
+    fn try_from(event: &ClientEvent) -> Result<Self, IngestError> {
         // Determine if the UUID is a proper v7 and if the date is close to now
         let uuid_datetime = try_uuid_datetime(&event.id())
             .inspect_err(|e| tracing::warn!("error converting UUID to datetime: {e}"))?;
@@ -190,17 +190,17 @@ mod tests {
             ..valid_ingest_event.clone()
         };
 
-        EventRecord::try_from(valid_ingest_event).unwrap();
+        EventRecord::try_from(&valid_ingest_event).unwrap();
         assert_eq!(
-            EventRecord::try_from(invalid_ingest_event_type).unwrap_err(),
+            EventRecord::try_from(&invalid_ingest_event_type).unwrap_err(),
             IngestError::UuidVersion
         );
         assert_eq!(
-            EventRecord::try_from(invalid_ingest_event_early).unwrap_err(),
+            EventRecord::try_from(&invalid_ingest_event_early).unwrap_err(),
             IngestError::TimestampOutOfRange
         );
         assert_eq!(
-            EventRecord::try_from(invalid_ingest_event_late).unwrap_err(),
+            EventRecord::try_from(&invalid_ingest_event_late).unwrap_err(),
             IngestError::TimestampOutOfRange
         );
     }

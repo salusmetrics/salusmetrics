@@ -2,6 +2,7 @@ use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use clickhouse::insert::Insert;
 use conf::conf_error::ConfError;
 use conf::settings::CommonSettings;
 use conf::state::CommonAppState;
@@ -35,6 +36,7 @@ async fn main() -> Result<(), Box<dyn Error + 'static>> {
     let mut app = Router::new()
         .route("/explore", get(explore))
         .route("/ingest", post(test_ingest))
+        .route("/multi", post(test_multi_ingest))
         .layer(TraceLayer::new_for_http())
         .layer(cors_layer)
         .layer(layer_settings.create_timeout_layer())
@@ -58,6 +60,44 @@ async fn main() -> Result<(), Box<dyn Error + 'static>> {
     Ok(())
 }
 
+async fn test_multi_ingest(
+    State(app_state): State<CommonAppState>,
+    headers: HeaderMap,
+    Json(event_bodies): Json<Vec<ClientEventBody>>,
+) -> impl IntoResponse {
+    let Ok(event_headers) = EventHeaders::try_from(&headers) else {
+        return StatusCode::BAD_REQUEST;
+    };
+
+    let events: Vec<ClientEvent> = event_bodies
+        .iter()
+        .map(|eb| ClientEvent::new(&event_headers, eb))
+        .collect();
+    let mut event_records: Vec<EventRecord> = Vec::with_capacity(events.len());
+    for ev in events.iter() {
+        let Ok(er) = EventRecord::try_from(ev) else {
+            return StatusCode::BAD_REQUEST;
+        };
+        event_records.push(er);
+    }
+    tracing::debug!("records: {event_records:?}");
+
+    let client = app_state.metrics_db_client;
+    let Ok(mut insert) = client.insert::<EventRecord>("EVENT") else {
+        return StatusCode::BAD_REQUEST;
+    };
+
+    for er in event_records.iter() {
+        if insert.write(er).await.is_err() {
+            return StatusCode::BAD_REQUEST;
+        }
+    }
+    if insert.end().await.is_err() {
+        return StatusCode::BAD_REQUEST;
+    }
+    StatusCode::OK
+}
+
 async fn test_ingest(
     State(app_state): State<CommonAppState>,
     headers: HeaderMap,
@@ -67,7 +107,7 @@ async fn test_ingest(
         return StatusCode::BAD_REQUEST;
     };
     let event = ClientEvent::new(&event_headers, &event);
-    let for_insert = EventRecord::try_from(event);
+    let for_insert = EventRecord::try_from(&event);
 
     let Ok(record) = for_insert else {
         return StatusCode::BAD_REQUEST;
@@ -90,8 +130,27 @@ async fn test_ingest(
 
 #[instrument]
 async fn explore() -> impl IntoResponse {
-    let valid_ingest_event =
-        ClientEventBody::new(ClientEventType::Visitor, Uuid::now_v7(), Some(Vec::new()));
+    let visitor_uuid = Uuid::now_v7();
+    let session_uuid = Uuid::now_v7();
+    let section_uuid = Uuid::now_v7();
+    let session_attrs: Vec<(String, String)> =
+        vec![("parent".to_owned(), visitor_uuid.to_string())];
+    let section_attrs: Vec<(String, String)> =
+        vec![("parent".to_owned(), session_uuid.to_string())];
+    let visitor_event =
+        ClientEventBody::new(ClientEventType::Visitor, visitor_uuid.to_owned(), None);
+    let session_event = ClientEventBody::new(
+        ClientEventType::Session,
+        session_uuid.to_owned(),
+        Some(session_attrs),
+    );
+    let section_event = ClientEventBody::new(
+        ClientEventType::Section,
+        section_uuid.to_owned(),
+        Some(section_attrs),
+    );
 
-    (StatusCode::OK, Json(valid_ingest_event))
+    let all_events: Vec<ClientEventBody> = vec![visitor_event, session_event, section_event];
+
+    (StatusCode::OK, Json(all_events))
 }

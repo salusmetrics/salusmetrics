@@ -6,8 +6,8 @@ CREATE TABLE SALUS_METRICS.EVENT (
     `event_type` Enum8 (
         'Visitor' = 1,
         'Session' = 2,
-        'Section' = 4,
-        'Click' = 5
+        'Section' = 3,
+        'Click' = 4
     ),
     `id` UUID,
     `ts` DateTime DEFAULT UUIDv7ToDateTime (id),
