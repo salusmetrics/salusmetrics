@@ -2,9 +2,11 @@ use http::header;
 use http::HeaderMap;
 use http::Uri;
 use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::ingest_error::IngestError;
+use crate::util::{is_ts_within_ingest_range, try_uuid_datetime};
 
 /// `ClientEvent` represents the unified event data that has been received
 /// as a request from an external, untrusted client. This contains both
@@ -15,37 +17,54 @@ pub struct ClientEvent {
     site: Site,
     event_type: ClientEventType,
     id: Uuid,
+    ts: OffsetDateTime,
     attrs: Option<Vec<(String, String)>>,
 }
 
 impl ClientEvent {
-    /// `ClientEvent` constructor from all parts
-    pub fn new(
+    /// `ClientEvent` constructor from publicly exposed attributes. Will fail
+    /// if the UUID is not v7 or if the timestamp for that uuid is not within
+    /// the allowed range for ingestion.
+    /// The event timestamp `ts` is determined by evaluating the UUID for a time.
+    /// This will error in cases where the UUID is not of type v7 and also if
+    /// the time for the event derived from the UUID is not within the bounds
+    /// of now - MAX_DURATION_BEFORE_PRESENT and now + MAX_DURATION_BEFORE_PRESENT
+    pub fn try_new(
         api_key: ApiKey,
         site: Site,
         event_type: ClientEventType,
         id: Uuid,
         attrs: Option<Vec<(String, String)>>,
-    ) -> Self {
-        Self {
-            api_key,
-            site,
-            event_type,
-            id,
-            attrs,
+    ) -> Result<Self, IngestError> {
+        let ts = try_uuid_datetime(&id)?;
+
+        if is_ts_within_ingest_range(ts) {
+            Ok(Self {
+                api_key,
+                site,
+                event_type,
+                id,
+                ts,
+                attrs,
+            })
+        } else {
+            Err(IngestError::TimestampOutOfRange)
         }
     }
 
     /// `ClientEvent` constructor from the request `EventHeaders` and specific
-    /// event `ClientEventBody`
-    pub fn new_from_headers_body(headers: &EventHeaders, body: &ClientEventBody) -> Self {
-        Self {
-            api_key: headers.api_key(),
-            site: headers.site(),
-            event_type: body.event_type(),
-            id: body.id(),
-            attrs: body.attrs(),
-        }
+    /// event `ClientEventBody`.
+    pub fn try_new_from_headers_body(
+        headers: &EventHeaders,
+        body: &ClientEventBody,
+    ) -> Result<Self, IngestError> {
+        Self::try_new(
+            headers.api_key(),
+            headers.site(),
+            body.event_type(),
+            body.id(),
+            body.attrs(),
+        )
     }
 
     /// Getter to retrieve the associated `ApiKey` from this `ClientEvent`
@@ -66,6 +85,11 @@ impl ClientEvent {
     /// Getter for id of type `Uuid` from this `ClientEvent`
     pub fn id(&self) -> Uuid {
         self.id.to_owned()
+    }
+
+    /// Getter for `ts` which represents the timestamp of this event
+    pub fn ts(&self) -> OffsetDateTime {
+        self.ts.to_owned()
     }
 
     /// Getter for the associated attrs from this `ClientEvent`
@@ -210,10 +234,15 @@ impl TryFrom<&HeaderMap> for EventHeaders {
 #[cfg(test)]
 mod tests {
     use http::{header, HeaderMap};
+    use uuid::{Timestamp, Uuid};
 
-    use crate::ingest_error::IngestError;
+    use crate::{client_event::ClientEvent, ingest_error::IngestError};
 
-    use super::EventHeaders;
+    use super::*;
+
+    const UUID_V4_STR: &str = "4e2abe52-5e86-4023-9f8b-34eba8d2cc59";
+    const API_KEY_STR: &str = "123_456_789";
+    const SITE: &str = "test.com";
 
     #[test]
     fn test_from_header_map() {
@@ -242,6 +271,57 @@ mod tests {
             EventHeaders::try_from(&invalid_api_key).unwrap_err(),
             IngestError::ApiKey,
             "Should fail with no valid refere"
+        );
+    }
+
+    #[test]
+    fn test_try_new() {
+        let uuid_now = Uuid::now_v7();
+        let (ts_now, _) = uuid_now.get_timestamp().unwrap().to_unix();
+        let Ok(_) = ClientEvent::try_new(
+            ApiKey(API_KEY_STR.to_owned()),
+            Site(SITE.to_owned()),
+            ClientEventType::Visitor,
+            uuid_now,
+            Some(Vec::new()),
+        ) else {
+            panic!("Expected valid ingest event")
+        };
+
+        let invalid_ingest_event_type = ClientEvent::try_new(
+            ApiKey(API_KEY_STR.to_owned()),
+            Site(SITE.to_owned()),
+            ClientEventType::Visitor,
+            Uuid::parse_str(UUID_V4_STR).unwrap(),
+            Some(Vec::new()),
+        );
+        assert_eq!(
+            invalid_ingest_event_type.unwrap_err(),
+            IngestError::UuidVersion
+        );
+
+        let invalid_ingest_event_early = ClientEvent::try_new(
+            ApiKey(API_KEY_STR.to_owned()),
+            Site(SITE.to_owned()),
+            ClientEventType::Visitor,
+            Uuid::new_v7(Timestamp::from_unix_time(ts_now - 3601, 0, 0, 8)),
+            Some(Vec::new()),
+        );
+        assert_eq!(
+            invalid_ingest_event_early.unwrap_err(),
+            IngestError::TimestampOutOfRange
+        );
+
+        let invalid_ingest_event_late = ClientEvent::try_new(
+            ApiKey(API_KEY_STR.to_owned()),
+            Site(SITE.to_owned()),
+            ClientEventType::Visitor,
+            Uuid::new_v7(Timestamp::from_unix_time(ts_now + 301, 0, 0, 8)),
+            Some(Vec::new()),
+        );
+        assert_eq!(
+            invalid_ingest_event_late.unwrap_err(),
+            IngestError::TimestampOutOfRange
         );
     }
 }

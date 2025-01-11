@@ -68,17 +68,14 @@ async fn test_multi_ingest(
         return StatusCode::BAD_REQUEST;
     };
 
-    let events: Vec<ClientEvent> = event_bodies
-        .iter()
-        .map(|eb| ClientEvent::new_from_headers_body(&event_headers, eb))
-        .collect();
-    let mut event_records: Vec<EventRecord> = Vec::with_capacity(events.len());
-    for ev in events.iter() {
-        let Ok(er) = EventRecord::try_from(ev) else {
+    let mut events: Vec<ClientEvent> = Vec::with_capacity(event_bodies.len());
+    for eb in event_bodies.iter() {
+        let Ok(ce) = ClientEvent::try_new_from_headers_body(&event_headers, eb) else {
             return StatusCode::BAD_REQUEST;
         };
-        event_records.push(er);
+        events.push(ce);
     }
+    let event_records: Vec<EventRecord> = events.iter().map(EventRecord::from).collect();
     tracing::debug!("records: {event_records:?}");
 
     let client = app_state.metrics_db_client;
@@ -105,12 +102,11 @@ async fn test_ingest(
     let Ok(event_headers) = EventHeaders::try_from(&headers) else {
         return StatusCode::BAD_REQUEST;
     };
-    let event = ClientEvent::new_from_headers_body(&event_headers, &event);
-    let for_insert = EventRecord::try_from(&event);
-
-    let Ok(record) = for_insert else {
+    let Ok(event) = ClientEvent::try_new_from_headers_body(&event_headers, &event) else {
         return StatusCode::BAD_REQUEST;
     };
+    let record = EventRecord::from(&event);
+
     tracing::debug!("record: {record:?}");
 
     let client = app_state.metrics_db_client;
