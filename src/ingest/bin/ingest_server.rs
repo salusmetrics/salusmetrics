@@ -7,8 +7,8 @@ use conf::settings::CommonSettings;
 use conf::state::CommonAppState;
 use http::Method;
 use hyper::{HeaderMap, StatusCode};
-use ingest::client_event::{ClientEvent, ClientEventBody, ClientEventType, EventHeaders};
-use ingest::event_record::EventRecord;
+use ingest::client_event_request::{ClientEventRequestBody, ClientEventRequestType};
+// use ingest::event_record::EventRecord;
 use std::error::Error;
 use tower_http::cors::Any;
 use tower_http::trace::TraceLayer;
@@ -34,8 +34,8 @@ async fn main() -> Result<(), Box<dyn Error + 'static>> {
 
     let mut app = Router::new()
         .route("/explore", get(explore))
-        .route("/ingest", post(test_ingest))
-        .route("/multi", post(test_multi_ingest))
+        // .route("/ingest", post(test_ingest))
+        // .route("/multi", post(test_multi_ingest))
         .layer(TraceLayer::new_for_http())
         .layer(cors_layer)
         .layer(layer_settings.create_timeout_layer())
@@ -59,69 +59,69 @@ async fn main() -> Result<(), Box<dyn Error + 'static>> {
     Ok(())
 }
 
-async fn test_multi_ingest(
-    State(app_state): State<CommonAppState>,
-    headers: HeaderMap,
-    Json(event_bodies): Json<Vec<ClientEventBody>>,
-) -> impl IntoResponse {
-    let Ok(event_headers) = EventHeaders::try_from(&headers) else {
-        return StatusCode::BAD_REQUEST;
-    };
+// async fn test_multi_ingest(
+//     State(app_state): State<CommonAppState>,
+//     headers: HeaderMap,
+//     Json(event_bodies): Json<Vec<ClientEventRequestBody>>,
+// ) -> impl IntoResponse {
+//     let Ok(event_headers) = ClientEventHeaders::try_from(&headers) else {
+//         return StatusCode::BAD_REQUEST;
+//     };
 
-    let mut events: Vec<ClientEvent> = Vec::with_capacity(event_bodies.len());
-    for eb in event_bodies.iter() {
-        let Ok(ce) = ClientEvent::try_new_from_headers_body(&event_headers, eb) else {
-            return StatusCode::BAD_REQUEST;
-        };
-        events.push(ce);
-    }
-    let event_records: Vec<EventRecord> = events.iter().map(EventRecord::from).collect();
-    tracing::debug!("records: {event_records:?}");
+//     let mut events: Vec<ClientEvent> = Vec::with_capacity(event_bodies.len());
+//     for eb in event_bodies.iter() {
+//         let Ok(ce) = ClientEvent::try_new_from_headers_body(&event_headers, eb) else {
+//             return StatusCode::BAD_REQUEST;
+//         };
+//         events.push(ce);
+//     }
+//     let event_records: Vec<EventRecord> = events.iter().map(EventRecord::from).collect();
+//     tracing::debug!("records: {event_records:?}");
 
-    let client = app_state.metrics_db_client;
-    let Ok(mut insert) = client.insert::<EventRecord>("EVENT") else {
-        return StatusCode::BAD_REQUEST;
-    };
+//     let client = app_state.metrics_db_client;
+//     let Ok(mut insert) = client.insert::<EventRecord>("EVENT") else {
+//         return StatusCode::BAD_REQUEST;
+//     };
 
-    for er in event_records.iter() {
-        if insert.write(er).await.is_err() {
-            return StatusCode::BAD_REQUEST;
-        }
-    }
-    if insert.end().await.is_err() {
-        return StatusCode::BAD_REQUEST;
-    }
-    StatusCode::OK
-}
+//     for er in event_records.iter() {
+//         if insert.write(er).await.is_err() {
+//             return StatusCode::BAD_REQUEST;
+//         }
+//     }
+//     if insert.end().await.is_err() {
+//         return StatusCode::BAD_REQUEST;
+//     }
+//     StatusCode::OK
+// }
 
-async fn test_ingest(
-    State(app_state): State<CommonAppState>,
-    headers: HeaderMap,
-    Json(event): Json<ClientEventBody>,
-) -> impl IntoResponse {
-    let Ok(event_headers) = EventHeaders::try_from(&headers) else {
-        return StatusCode::BAD_REQUEST;
-    };
-    let Ok(event) = ClientEvent::try_new_from_headers_body(&event_headers, &event) else {
-        return StatusCode::BAD_REQUEST;
-    };
-    let record = EventRecord::from(&event);
+// async fn test_ingest(
+//     State(app_state): State<CommonAppState>,
+//     headers: HeaderMap,
+//     Json(event): Json<ClientEventRequestBody>,
+// ) -> impl IntoResponse {
+//     let Ok(event_headers) = ClientEventHeaders::try_from(&headers) else {
+//         return StatusCode::BAD_REQUEST;
+//     };
+//     let Ok(event) = ClientEvent::try_new_from_headers_body(&event_headers, &event) else {
+//         return StatusCode::BAD_REQUEST;
+//     };
+//     let record = EventRecord::from(&event);
 
-    tracing::debug!("record: {record:?}");
+//     tracing::debug!("record: {record:?}");
 
-    let client = app_state.metrics_db_client;
-    let Ok(mut insert) = client.insert("EVENT") else {
-        return StatusCode::BAD_REQUEST;
-    };
+//     let client = app_state.metrics_db_client;
+//     let Ok(mut insert) = client.insert("EVENT") else {
+//         return StatusCode::BAD_REQUEST;
+//     };
 
-    if insert.write(&record).await.is_err() {
-        return StatusCode::BAD_REQUEST;
-    }
-    if insert.end().await.is_err() {
-        return StatusCode::BAD_REQUEST;
-    }
-    StatusCode::OK
-}
+//     if insert.write(&record).await.is_err() {
+//         return StatusCode::BAD_REQUEST;
+//     }
+//     if insert.end().await.is_err() {
+//         return StatusCode::BAD_REQUEST;
+//     }
+//     StatusCode::OK
+// }
 
 #[instrument]
 async fn explore() -> impl IntoResponse {
@@ -132,20 +132,23 @@ async fn explore() -> impl IntoResponse {
         vec![("parent".to_owned(), visitor_uuid.to_string())];
     let section_attrs: Vec<(String, String)> =
         vec![("parent".to_owned(), session_uuid.to_string())];
-    let visitor_event =
-        ClientEventBody::new(ClientEventType::Visitor, visitor_uuid.to_owned(), None);
-    let session_event = ClientEventBody::new(
-        ClientEventType::Session,
+    let visitor_event = ClientEventRequestBody::new(
+        ClientEventRequestType::Visitor,
+        visitor_uuid.to_owned(),
+        None,
+    );
+    let session_event = ClientEventRequestBody::new(
+        ClientEventRequestType::Session,
         session_uuid.to_owned(),
         Some(session_attrs),
     );
-    let section_event = ClientEventBody::new(
-        ClientEventType::Section,
+    let section_event = ClientEventRequestBody::new(
+        ClientEventRequestType::Section,
         section_uuid.to_owned(),
         Some(section_attrs),
     );
 
-    let all_events: Vec<ClientEventBody> = vec![visitor_event, session_event, section_event];
+    let all_events: Vec<ClientEventRequestBody> = vec![visitor_event, session_event, section_event];
 
     (StatusCode::OK, Json(all_events))
 }
