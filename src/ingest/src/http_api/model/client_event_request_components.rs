@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use axum::extract::FromRequestParts;
 use http::header;
 use http::HeaderMap;
@@ -6,25 +8,15 @@ use http::Uri;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::domain::error::ingest_event_error::IngestEventError;
-
-/// `ClientEventRequestType` represents the type of analytics event submitted by
-/// client. This enum must match up with the `event_record`'s
-/// `EventRecordType` enum.
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub enum ClientEventRequestType {
-    Visitor,
-    Session,
-    Section,
-    Click,
-}
+use super::client_event_request::ClientEventRequestError;
+use super::client_event_request::ClientEventRequestType;
 
 /// `ClientEventRequestBody` represents the interior fields an event request that an
 /// external, untrusted client submits to the system.
 ///
 /// `ClientEventRequestBody` is general across all types of events from new visitors down
-/// to page actions. Handled by including `ClientEventRequestType` and generic attrs Vec
-/// of tuples to represent necessary data across types. Critically, the id must
+/// to page actions. Handled by including `ClientEventRequestType` and generic attrs
+/// HashMap to represent necessary data across types. Critically, the id must
 /// be a UUID v7 with the datetime portion of this id extracted to represent the
 /// event time. If this time is not within a certain span of now, the event is
 /// rejected.
@@ -39,10 +31,10 @@ pub enum ClientEventRequestType {
 /// in attrs by the client, but other data will be added by the server side.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ClientEventRequestBody {
-    event_type: ClientEventRequestType,
+    pub event_type: ClientEventRequestType,
     #[serde(with = "clickhouse::serde::uuid")]
-    id: Uuid,
-    attrs: Option<Vec<(String, String)>>,
+    pub id: Uuid,
+    pub attrs: Option<HashMap<String, String>>,
 }
 
 impl ClientEventRequestBody {
@@ -50,28 +42,13 @@ impl ClientEventRequestBody {
     pub fn new(
         event_type: ClientEventRequestType,
         id: Uuid,
-        attrs: Option<Vec<(String, String)>>,
+        attrs: Option<HashMap<String, String>>,
     ) -> Self {
         Self {
             event_type,
             id,
             attrs,
         }
-    }
-
-    /// Getter for `ClientEventRequestType` from this `ClientEventRequestBody`
-    pub fn event_type(&self) -> &ClientEventRequestType {
-        &self.event_type
-    }
-
-    /// Getter for id of type `Uuid` from this `ClientEventRequestBody`
-    pub fn id(&self) -> &Uuid {
-        &self.id
-    }
-
-    /// Getter for the associated attrs from this `ClientEventRequestBody`
-    pub fn attrs(&self) -> &Option<Vec<(String, String)>> {
-        &self.attrs
     }
 }
 
@@ -80,8 +57,8 @@ impl ClientEventRequestBody {
 /// HTTP headers that arrive with that request.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ClientEventRequestHeaders {
-    api_key: String,
-    site: String,
+    pub api_key: String,
+    pub site: String,
 }
 
 impl ClientEventRequestHeaders {
@@ -92,38 +69,28 @@ impl ClientEventRequestHeaders {
             site: site.as_ref().to_owned(),
         }
     }
-
-    /// Getter to retrieve the associated `ApiKey` from this `ClientEventRequestHeaders`
-    pub fn api_key(&self) -> &str {
-        &self.api_key
-    }
-
-    /// Getter to retrieve the associated `Site` for this `ClientEventRequestHeaders`
-    pub fn site(&self) -> &str {
-        &self.site
-    }
 }
 
 impl TryFrom<&HeaderMap> for ClientEventRequestHeaders {
-    type Error = IngestEventError;
+    type Error = ClientEventRequestError;
 
     fn try_from(value: &HeaderMap) -> Result<Self, Self::Error> {
         let referer = value
             .get(header::REFERER)
-            .ok_or(IngestEventError::Site)?
+            .ok_or(ClientEventRequestError::InvalidRequestHeaders)?
             .to_str()
-            .map_err(|_| IngestEventError::Site)?;
+            .map_err(|_| ClientEventRequestError::InvalidRequestHeaders)?;
         let site = referer
             .parse::<Uri>()
-            .map_err(|_| IngestEventError::Site)?
+            .map_err(|_| ClientEventRequestError::InvalidRequestHeaders)?
             .host()
-            .ok_or(IngestEventError::Site)?
+            .ok_or(ClientEventRequestError::InvalidRequestHeaders)?
             .to_string();
         let api_key = value
             .get("api-key")
-            .ok_or(IngestEventError::ApiKey)?
+            .ok_or(ClientEventRequestError::ApiKey)?
             .to_str()
-            .map_err(|_| IngestEventError::ApiKey)?
+            .map_err(|_| ClientEventRequestError::ApiKey)?
             .to_string();
         Ok(ClientEventRequestHeaders { api_key, site })
     }
@@ -148,7 +115,6 @@ mod tests {
     use http::{header, HeaderMap};
 
     use super::*;
-    use crate::ingest_error::IngestEventError;
 
     #[test]
     fn test_from_header_map() {
@@ -167,16 +133,16 @@ mod tests {
         invalid_referer.insert("api-key", "1234-5678-90".parse().unwrap());
         assert_eq!(
             ClientEventRequestHeaders::try_from(&invalid_referer).unwrap_err(),
-            IngestEventError::Site,
-            "Should fail with no valid refere"
+            ClientEventRequestError::InvalidRequestHeaders,
+            "Should fail with no valid referer"
         );
 
         let mut invalid_api_key = HeaderMap::new();
         invalid_api_key.insert(header::REFERER, "http://test.com/test/dir".parse().unwrap());
         assert_eq!(
             ClientEventRequestHeaders::try_from(&invalid_api_key).unwrap_err(),
-            IngestEventError::ApiKey,
-            "Should fail with no valid refere"
+            ClientEventRequestError::ApiKey,
+            "Should fail with no valid api key"
         );
     }
 }

@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::domain::{
     model::ingest_event::{
-        ClickEvent, CoreEvent, IngestEvent, SectionEvent, SessionEvent, VisitorEvent,
+        ClickEvent, IngestEvent, IngestEventCore, SectionEvent, SessionEvent, VisitorEvent,
     },
     repository::ingest_event_repository::IngestRepositoryError,
 };
@@ -65,7 +65,9 @@ impl TryFrom<&VisitorEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
     fn try_from(event: &VisitorEvent) -> Result<Self, Self::Error> {
         let builder = ClickhouseEventRecordBuilder::from(&event.core);
-        builder.try_build()
+        builder
+            .event_type(ClickhouseEventRecordType::Visitor)
+            .try_build()
     }
 }
 
@@ -73,7 +75,10 @@ impl TryFrom<&SessionEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
     fn try_from(event: &SessionEvent) -> Result<Self, Self::Error> {
         let builder = ClickhouseEventRecordBuilder::from(&event.core);
-        builder.add_parent(event.parent).try_build()
+        builder
+            .event_type(ClickhouseEventRecordType::Session)
+            .add_parent(event.parent)
+            .try_build()
     }
 }
 
@@ -81,7 +86,10 @@ impl TryFrom<&SectionEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
     fn try_from(event: &SectionEvent) -> Result<Self, Self::Error> {
         let builder = ClickhouseEventRecordBuilder::from(&event.core);
-        builder.add_parent(event.parent).try_build()
+        builder
+            .event_type(ClickhouseEventRecordType::Section)
+            .add_parent(event.parent)
+            .try_build()
     }
 }
 
@@ -89,7 +97,10 @@ impl TryFrom<&ClickEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
     fn try_from(event: &ClickEvent) -> Result<Self, Self::Error> {
         let builder = ClickhouseEventRecordBuilder::from(&event.core);
-        builder.add_parent(event.parent).try_build()
+        builder
+            .event_type(ClickhouseEventRecordType::Click)
+            .add_parent(event.parent)
+            .try_build()
     }
 }
 
@@ -102,8 +113,8 @@ struct ClickhouseEventRecordBuilder {
     attrs: Vec<(String, String)>,
 }
 
-impl<T> From<&CoreEvent<T>> for ClickhouseEventRecordBuilder {
-    fn from(event: &CoreEvent<T>) -> Self {
+impl<T> From<&IngestEventCore<T>> for ClickhouseEventRecordBuilder {
+    fn from(event: &IngestEventCore<T>) -> Self {
         Self {
             api_key: event.api_key.0.to_owned(),
             site: event.site.0.to_owned(),
@@ -116,13 +127,8 @@ impl<T> From<&CoreEvent<T>> for ClickhouseEventRecordBuilder {
 }
 
 impl ClickhouseEventRecordBuilder {
-    fn event_type(mut self, event: &IngestEvent) -> Self {
-        match event {
-            IngestEvent::Visitor(_) => self.event_type = Some(ClickhouseEventRecordType::Visitor),
-            IngestEvent::Session(_) => self.event_type = Some(ClickhouseEventRecordType::Session),
-            IngestEvent::Section(_) => self.event_type = Some(ClickhouseEventRecordType::Section),
-            IngestEvent::Click(_) => self.event_type = Some(ClickhouseEventRecordType::Click),
-        }
+    fn event_type(mut self, event_type: ClickhouseEventRecordType) -> Self {
+        self.event_type = Some(event_type);
         self
     }
 

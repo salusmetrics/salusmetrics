@@ -42,6 +42,12 @@ impl IngestEventRepository for ClickhouseIngestRepository {
                 IngestRepositoryError::Repository
             })?;
         }
+
+        insert.end().await.map_err(|e| {
+            tracing::error!("Encountered error ending insert: {e}");
+            IngestRepositoryError::Repository
+        })?;
+
         Ok(IngestActionSummary::Save(IngestEventSaveSummary {
             event_count: records.len(),
         }))

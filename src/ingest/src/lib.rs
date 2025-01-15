@@ -1,4 +1,4 @@
-pub mod client_event_request;
 pub mod domain;
+pub mod http_api;
 pub mod repositories;
 pub mod services;

@@ -1,13 +1,18 @@
-use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
+use clickhouse::Client;
 use conf::conf_error::ConfError;
 use conf::settings::CommonSettings;
-use conf::state::CommonAppState;
 use http::Method;
-use hyper::{HeaderMap, StatusCode};
-use ingest::client_event_request::{ClientEventRequestBody, ClientEventRequestType};
+use hyper::StatusCode;
+use ingest::http_api::handlers::save_client_events::save_client_events;
+use ingest::http_api::model::client_event_request::ClientEventRequestType;
+use ingest::http_api::model::client_event_request_components::ClientEventRequestBody;
+use ingest::http_api::model::ingest_application_state::IngestApplicationState;
+use ingest::repositories::clickhouse_ingest_repository::ClickhouseIngestRepository;
+use ingest::services::ingest_service::IngestService;
+use std::collections::HashMap;
 // use ingest::event_record::EventRecord;
 use std::error::Error;
 use tower_http::cors::Any;
@@ -30,12 +35,17 @@ async fn main() -> Result<(), Box<dyn Error + 'static>> {
         .allow_methods([Method::POST])
         .allow_headers(Any);
 
-    let state = CommonAppState::try_from(&env_settings)?;
-
+    let metrics_client: Client = (&env_settings.metricsdb().ok_or(ConfError::MetricsDb)?).into();
+    let ingest_repository = ClickhouseIngestRepository::new(metrics_client);
+    let ingest_service = IngestService::new(ingest_repository);
+    let state = IngestApplicationState::new(ingest_service);
     let mut app = Router::new()
         .route("/explore", get(explore))
         // .route("/ingest", post(test_ingest))
-        // .route("/multi", post(test_multi_ingest))
+        .route(
+            "/multi",
+            post(save_client_events::<IngestService<ClickhouseIngestRepository>>),
+        )
         .layer(TraceLayer::new_for_http())
         .layer(cors_layer)
         .layer(layer_settings.create_timeout_layer())
@@ -128,10 +138,10 @@ async fn explore() -> impl IntoResponse {
     let visitor_uuid = Uuid::now_v7();
     let session_uuid = Uuid::now_v7();
     let section_uuid = Uuid::now_v7();
-    let session_attrs: Vec<(String, String)> =
-        vec![("parent".to_owned(), visitor_uuid.to_string())];
-    let section_attrs: Vec<(String, String)> =
-        vec![("parent".to_owned(), session_uuid.to_string())];
+    let mut session_attrs: HashMap<String, String> = HashMap::new();
+    session_attrs.insert("parent".to_owned(), visitor_uuid.to_string());
+    let mut section_attrs: HashMap<String, String> = HashMap::new();
+    section_attrs.insert("parent".to_owned(), session_uuid.to_string());
     let visitor_event = ClientEventRequestBody::new(
         ClientEventRequestType::Visitor,
         visitor_uuid.to_owned(),

@@ -51,7 +51,7 @@ impl Site {
     }
 }
 
-/// `CoreEvent` represents the common fields that all events have like
+/// `IngestEventCore` represents the common fields that all events have like
 /// `api_key`, `id` and `ts`.
 ///
 /// Note that the timestamp, `ts` for the event is strictly derived from the
@@ -60,7 +60,7 @@ impl Site {
 /// given ingestion event must be within a specified duration of now, or else
 /// an error will be returned during attempted construction.
 #[derive(Debug, Clone)]
-pub struct CoreEvent<T> {
+pub struct IngestEventCore<T> {
     pub api_key: ApiKey,
     pub site: Site,
     pub id: Uuid,
@@ -68,8 +68,8 @@ pub struct CoreEvent<T> {
     _event_type: PhantomData<T>,
 }
 
-impl<T> CoreEvent<T> {
-    /// `CoreEvent` constructor
+impl<T> IngestEventCore<T> {
+    /// `IngestEventCore` constructor
     pub fn try_new(api_key: ApiKey, site: Site, id: Uuid) -> Result<Self, IngestEventError> {
         let ts = try_uuid_datetime(&id)?;
 
@@ -92,24 +92,24 @@ impl<T> CoreEvent<T> {
 /// events are based.
 #[derive(Debug, Clone)]
 pub struct VisitorEvent {
-    pub core: CoreEvent<Self>,
+    pub core: IngestEventCore<Self>,
 }
 impl VisitorEvent {
     /// `VisitorEvent` all field constructor
     pub fn try_new(api_key: ApiKey, site: Site, id: Uuid) -> Result<Self, IngestEventError> {
-        Self::try_new_with_core_event(CoreEvent::try_new(api_key, site, id)?)
+        Self::try_new_with_core_event(IngestEventCore::try_new(api_key, site, id)?)
     }
 
-    /// `VisitorEvent` constructor with `CoreEvent` already created for
+    /// `VisitorEvent` constructor with `IngestEventCore` already created for
     /// convenience or ergonomics
-    pub fn try_new_with_core_event(core: CoreEvent<Self>) -> Result<Self, IngestEventError> {
+    pub fn try_new_with_core_event(core: IngestEventCore<Self>) -> Result<Self, IngestEventError> {
         Ok(Self { core })
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct SessionEvent {
-    pub core: CoreEvent<Self>,
+    pub core: IngestEventCore<Self>,
     pub parent: Uuid,
 }
 impl SessionEvent {
@@ -120,13 +120,13 @@ impl SessionEvent {
         id: Uuid,
         parent: Uuid,
     ) -> Result<Self, IngestEventError> {
-        Self::try_new_with_core_event(CoreEvent::try_new(api_key, site, id)?, parent)
+        Self::try_new_with_core_event(IngestEventCore::try_new(api_key, site, id)?, parent)
     }
 
-    /// `SessionEvent` constructor with `CoreEvent` already created for
+    /// `SessionEvent` constructor with `IngestEventCore` already created for
     /// convenience or ergonomics
     pub fn try_new_with_core_event(
-        core: CoreEvent<Self>,
+        core: IngestEventCore<Self>,
         parent: Uuid,
     ) -> Result<Self, IngestEventError> {
         Ok(Self { core, parent })
@@ -135,7 +135,7 @@ impl SessionEvent {
 
 #[derive(Debug, Clone)]
 pub struct SectionEvent {
-    pub core: CoreEvent<Self>,
+    pub core: IngestEventCore<Self>,
     pub parent: Uuid,
 }
 impl SectionEvent {
@@ -146,13 +146,13 @@ impl SectionEvent {
         id: Uuid,
         parent: Uuid,
     ) -> Result<Self, IngestEventError> {
-        Self::try_new_with_core_event(CoreEvent::try_new(api_key, site, id)?, parent)
+        Self::try_new_with_core_event(IngestEventCore::try_new(api_key, site, id)?, parent)
     }
 
-    /// `SectionEvent` constructor with `CoreEvent` already created for
+    /// `SectionEvent` constructor with `IngestEventCore` already created for
     /// convenience or ergonomics
     pub fn try_new_with_core_event(
-        core: CoreEvent<Self>,
+        core: IngestEventCore<Self>,
         parent: Uuid,
     ) -> Result<Self, IngestEventError> {
         Ok(Self { core, parent })
@@ -161,7 +161,7 @@ impl SectionEvent {
 
 #[derive(Debug, Clone)]
 pub struct ClickEvent {
-    pub core: CoreEvent<Self>,
+    pub core: IngestEventCore<Self>,
     pub parent: Uuid,
 }
 impl ClickEvent {
@@ -172,13 +172,13 @@ impl ClickEvent {
         id: Uuid,
         parent: Uuid,
     ) -> Result<Self, IngestEventError> {
-        Self::try_new_with_core_event(CoreEvent::try_new(api_key, site, id)?, parent)
+        Self::try_new_with_core_event(IngestEventCore::try_new(api_key, site, id)?, parent)
     }
 
-    /// `ClickEvent` constructor with `CoreEvent` already created for
+    /// `ClickEvent` constructor with `IngestEventCore` already created for
     /// convenience or ergonomics
     pub fn try_new_with_core_event(
-        core: CoreEvent<Self>,
+        core: IngestEventCore<Self>,
         parent: Uuid,
     ) -> Result<Self, IngestEventError> {
         Ok(Self { core, parent })
@@ -199,14 +199,14 @@ mod tests {
     fn test_try_new_events() {
         let uuid_now = Uuid::now_v7();
         let (ts_now, _) = uuid_now.get_timestamp().unwrap().to_unix();
-        let test_core: Result<CoreEvent<VisitorEvent>, IngestEventError> =
-            CoreEvent::try_new(ApiKey::new(API_KEY_STR), Site::new(SITE), uuid_now);
+        let test_core: Result<IngestEventCore<VisitorEvent>, IngestEventError> =
+            IngestEventCore::try_new(ApiKey::new(API_KEY_STR), Site::new(SITE), uuid_now);
         let Ok(_) = test_core else {
-            panic!("Expected valid CoreEvent");
+            panic!("Expected valid IngestEventCore");
         };
 
-        let invalid_ingest_uuid_type: Result<CoreEvent<SessionEvent>, IngestEventError> =
-            CoreEvent::try_new(
+        let invalid_ingest_uuid_type: Result<IngestEventCore<SessionEvent>, IngestEventError> =
+            IngestEventCore::try_new(
                 ApiKey::new(API_KEY_STR),
                 Site::new(SITE),
                 Uuid::parse_str(UUID_V4_STR).unwrap(),
@@ -216,8 +216,8 @@ mod tests {
             IngestEventError::UuidVersion
         );
 
-        let invalid_ingest_event_early: Result<CoreEvent<SectionEvent>, IngestEventError> =
-            CoreEvent::try_new(
+        let invalid_ingest_event_early: Result<IngestEventCore<SectionEvent>, IngestEventError> =
+            IngestEventCore::try_new(
                 ApiKey::new(API_KEY_STR),
                 Site::new(SITE),
                 Uuid::new_v7(Timestamp::from_unix_time(ts_now - 3601, 0, 0, 8)),
@@ -227,8 +227,8 @@ mod tests {
             IngestEventError::TimestampOutOfRange
         );
 
-        let invalid_ingest_event_late: Result<CoreEvent<ClickEvent>, IngestEventError> =
-            CoreEvent::try_new(
+        let invalid_ingest_event_late: Result<IngestEventCore<ClickEvent>, IngestEventError> =
+            IngestEventCore::try_new(
                 ApiKey::new(API_KEY_STR),
                 Site::new(SITE),
                 Uuid::new_v7(Timestamp::from_unix_time(ts_now + 301, 0, 0, 8)),
