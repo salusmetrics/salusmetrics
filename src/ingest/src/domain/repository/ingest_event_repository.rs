@@ -1,3 +1,5 @@
+use std::future::Future;
+
 use thiserror::Error;
 
 use crate::domain::model::{ingest_action_summary::IngestActionSummary, ingest_event::IngestEvent};
@@ -12,8 +14,8 @@ pub enum IngestRepositoryError {
 }
 
 pub trait IngestEventRepository: 'static + Clone + Send + Sync {
-    async fn save(
+    fn save(
         &self,
         events: Vec<IngestEvent>,
-    ) -> Result<IngestActionSummary, IngestRepositoryError>;
+    ) -> impl Future<Output = Result<IngestActionSummary, IngestRepositoryError>> + Send;
 }

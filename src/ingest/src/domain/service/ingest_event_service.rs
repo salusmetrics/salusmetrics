@@ -1,3 +1,5 @@
+use std::future::Future;
+
 use thiserror::Error;
 
 use crate::domain::{
@@ -13,8 +15,8 @@ pub enum IngestServiceError {
 }
 
 pub trait IngestEventService: 'static + Send + Sync {
-    async fn save(
+    fn save(
         &self,
         events: Vec<IngestEvent>,
-    ) -> Result<IngestActionSummary, IngestServiceError>;
+    ) -> impl Future<Output = Result<IngestActionSummary, IngestServiceError>> + Send;
 }
