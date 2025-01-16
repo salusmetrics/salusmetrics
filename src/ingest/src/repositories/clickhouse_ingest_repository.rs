@@ -8,6 +8,13 @@ use crate::domain::repository::ingest_event_repository::{
 
 use super::clickhouse_event_record::ClickhouseEventRecord;
 
+/// `ClickhouseIngestRepository` is an implementation of the
+/// `IngestEventRepository` trait that utilizes ClickHouse as the back end.
+/// Crucially, all event types are saved into ClickHouse in the same table,
+/// `EVENT` that has a NULL table engine and merely acts as a common place
+/// from which to base materialized views which subsequently populate the
+/// specific type tables, which are also monitored by other materialized views
+/// that then derive aggregate data for reporting.
 #[derive(Clone)]
 pub struct ClickhouseIngestRepository {
     metrics_db_client: Client,
@@ -20,6 +27,8 @@ impl ClickhouseIngestRepository {
 }
 
 impl IngestEventRepository for ClickhouseIngestRepository {
+    /// `save` method for ClickHouse puts all events into a common table called
+    /// `EVENT` which is then used to populate all other metrics tables.
     async fn save(
         &self,
         events: Vec<IngestEvent>,

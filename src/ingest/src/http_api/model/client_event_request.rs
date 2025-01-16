@@ -28,6 +28,9 @@ pub enum ClientEventRequestType {
     Click,
 }
 
+/// `ClientEventRequestError` encapsulates the error types that can occur
+/// at the HTTP tier. This is primarily through wrapping errors that can arise
+/// at lower layers.
 #[derive(Clone, Error, Debug, PartialEq, Eq)]
 pub enum ClientEventRequestError {
     #[error("API KEY missing from request header")]
@@ -36,14 +39,21 @@ pub enum ClientEventRequestError {
     IngestEvent(#[from] IngestEventError),
     #[error("Error returned from IngestEventService")]
     IngestService(#[from] IngestServiceError),
-    #[error("Invalid request headers")]
-    InvalidRequestBody,
     #[error("Invalid request body")]
+    InvalidRequestBody,
+    #[error("Invalid request headers")]
     InvalidRequestHeaders,
     #[error("Somehow ended up trying to create event of one type with input for another - this should never happen")]
     TypeMismatch,
 }
 
+/// `ClientEventRequestError` needs to implement `IntoResponse` in order to
+/// provide an ergonomic method signature wherein all HTTP handlers can return
+/// `Result<ClientEventActionSummary, ClientEventRequestError>` and have both
+/// portions of the `Result` properly implement `IntoResponse`
+/// Note that this response is meant to not reveal any internal error
+/// information to the client for the sake of security. Instead, all responses
+/// are merely HTTP response codes with no accompanying body.
 impl IntoResponse for ClientEventRequestError {
     fn into_response(self) -> axum::response::Response {
         match self {
@@ -68,12 +78,18 @@ impl IntoResponse for ClientEventRequestError {
     }
 }
 
+/// `ClientEventRequest` represents an external metrics event from an untrusted
+/// HTTP source. Crucially, data to build up this request comes from both the
+/// headers of the HTTP request as well as from the body of the request. Each
+/// event in a full HTTP request is individually constructed.
 pub struct ClientEventRequest {
     pub headers: ClientEventRequestHeaders,
     pub body: ClientEventRequestBody,
 }
 
 impl ClientEventRequest {
+    /// `attr` method provides an ergonomic way to access possible attributes
+    /// that were specified in the body of the request for a given event
     pub fn attr(&self, key: &str) -> Option<&String> {
         match &self.body.attrs {
             None => None,
@@ -82,6 +98,11 @@ impl ClientEventRequest {
     }
 }
 
+/// `ClientEventRequest` needs to be able to be translated into the domain
+/// object of `IngestEvent`. This call can fail because domain rules are
+/// applied at construction time. This is a two-part step in order to create
+/// both the outer `IngestEvent` enum variant as well as the discriminant
+/// type for each.
 impl TryFrom<&ClientEventRequest> for IngestEvent {
     type Error = ClientEventRequestError;
 
@@ -95,6 +116,7 @@ impl TryFrom<&ClientEventRequest> for IngestEvent {
     }
 }
 
+/// `ClientEventRequest` to the discriminant for `IngestEvent::Visitor`
 impl TryFrom<&ClientEventRequest> for VisitorEvent {
     type Error = ClientEventRequestError;
     fn try_from(value: &ClientEventRequest) -> Result<Self, Self::Error> {
@@ -112,6 +134,7 @@ impl TryFrom<&ClientEventRequest> for VisitorEvent {
     }
 }
 
+/// `ClientEventRequest` to the discriminant for `IngestEvent::Session`
 impl TryFrom<&ClientEventRequest> for SessionEvent {
     type Error = ClientEventRequestError;
     fn try_from(value: &ClientEventRequest) -> Result<Self, Self::Error> {
@@ -135,6 +158,7 @@ impl TryFrom<&ClientEventRequest> for SessionEvent {
     }
 }
 
+/// `ClientEventRequest` to the discriminant for `IngestEvent::Section`
 impl TryFrom<&ClientEventRequest> for SectionEvent {
     type Error = ClientEventRequestError;
     fn try_from(value: &ClientEventRequest) -> Result<Self, Self::Error> {
@@ -158,6 +182,7 @@ impl TryFrom<&ClientEventRequest> for SectionEvent {
     }
 }
 
+/// `ClientEventRequest` to the discriminant for `IngestEvent::Click`
 impl TryFrom<&ClientEventRequest> for ClickEvent {
     type Error = ClientEventRequestError;
     fn try_from(value: &ClientEventRequest) -> Result<Self, Self::Error> {

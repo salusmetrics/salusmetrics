@@ -11,6 +11,10 @@ use uuid::Uuid;
 use super::client_event_request::ClientEventRequestError;
 use super::client_event_request::ClientEventRequestType;
 
+/// `API_KEY_HTTP_HEADER` defines the name of the HTTP header that is examined
+/// to determine a request's api_key
+pub const API_KEY_HTTP_HEADER: &str = "api-key";
+
 /// `ClientEventRequestBody` represents the interior fields an event request that an
 /// external, untrusted client submits to the system.
 ///
@@ -71,6 +75,8 @@ impl ClientEventRequestHeaders {
     }
 }
 
+/// `ClientEventRequestHeaders` must be able to be derived from incoming HTTP
+/// headers alone.
 impl TryFrom<&HeaderMap> for ClientEventRequestHeaders {
     type Error = ClientEventRequestError;
 
@@ -87,7 +93,7 @@ impl TryFrom<&HeaderMap> for ClientEventRequestHeaders {
             .ok_or(ClientEventRequestError::InvalidRequestHeaders)?
             .to_string();
         let api_key = value
-            .get("api-key")
+            .get(API_KEY_HTTP_HEADER)
             .ok_or(ClientEventRequestError::ApiKey)?
             .to_str()
             .map_err(|_| ClientEventRequestError::ApiKey)?
@@ -96,6 +102,8 @@ impl TryFrom<&HeaderMap> for ClientEventRequestHeaders {
     }
 }
 
+/// `ClientEventRequestHeaders` when handled by `FromRequestParts` allows the
+/// handler methods to have arguments of type `ClientEventRequestHeaders`
 impl<S> FromRequestParts<S> for ClientEventRequestHeaders
 where
     S: Send + Sync,
@@ -121,7 +129,7 @@ mod tests {
         // Positive test case
         let mut valid_headers = HeaderMap::new();
         valid_headers.insert(header::REFERER, "http://test.com/test/dir".parse().unwrap());
-        valid_headers.insert("api-key", "1234-5678-90".parse().unwrap());
+        valid_headers.insert(API_KEY_HTTP_HEADER, "1234-5678-90".parse().unwrap());
 
         if ClientEventRequestHeaders::try_from(&valid_headers).is_err() {
             println!("headers: {:?}", valid_headers);
@@ -130,7 +138,7 @@ mod tests {
 
         // Negative test cases
         let mut invalid_referer = HeaderMap::new();
-        invalid_referer.insert("api-key", "1234-5678-90".parse().unwrap());
+        invalid_referer.insert(API_KEY_HTTP_HEADER, "1234-5678-90".parse().unwrap());
         assert_eq!(
             ClientEventRequestHeaders::try_from(&invalid_referer).unwrap_err(),
             ClientEventRequestError::InvalidRequestHeaders,

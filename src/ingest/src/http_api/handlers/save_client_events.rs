@@ -10,6 +10,11 @@ use crate::{
     },
 };
 
+/// `save_client_events` expects POST data in JSON format that consists of
+/// a list of `ClientEventRequestBody` structs as well as information in the
+/// HTTP headers which can be used to determine the `api_key` and the `site`
+/// for the incoming request. `site` is determined in a simple fashion by
+/// examining the referrer attribute, whereas
 pub async fn save_client_events<I: IngestEventService>(
     State(state): State<IngestApplicationState<I>>,
     client_request_headers: ClientEventRequestHeaders,

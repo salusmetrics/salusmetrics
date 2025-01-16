@@ -56,6 +56,8 @@ pub struct ClickhouseEventRecord {
     attrs: Vec<(String, String)>,
 }
 
+/// `ClickhouseEventRecord` translates from the core `IngestEvent` domain
+/// model into something that can be persisted to the Clickhouse DB
 impl TryFrom<&IngestEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
     fn try_from(value: &IngestEvent) -> Result<Self, Self::Error> {
@@ -68,6 +70,8 @@ impl TryFrom<&IngestEvent> for ClickhouseEventRecord {
     }
 }
 
+/// `ClickhouseEventRecord` derived from each `IngestEvent` type's discriminant
+/// `Visitor` discriminant
 impl TryFrom<&VisitorEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
     fn try_from(event: &VisitorEvent) -> Result<Self, Self::Error> {
@@ -78,6 +82,8 @@ impl TryFrom<&VisitorEvent> for ClickhouseEventRecord {
     }
 }
 
+/// `ClickhouseEventRecord` derived from each `IngestEvent` type's discriminant
+/// `Session` discriminant
 impl TryFrom<&SessionEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
     fn try_from(event: &SessionEvent) -> Result<Self, Self::Error> {
@@ -89,6 +95,8 @@ impl TryFrom<&SessionEvent> for ClickhouseEventRecord {
     }
 }
 
+/// `ClickhouseEventRecord` derived from each `IngestEvent` type's discriminant
+/// `Section` discriminant
 impl TryFrom<&SectionEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
     fn try_from(event: &SectionEvent) -> Result<Self, Self::Error> {
@@ -100,6 +108,8 @@ impl TryFrom<&SectionEvent> for ClickhouseEventRecord {
     }
 }
 
+/// `ClickhouseEventRecord` derived from each `IngestEvent` type's discriminant
+/// `Click` discriminant
 impl TryFrom<&ClickEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
     fn try_from(event: &ClickEvent) -> Result<Self, Self::Error> {
@@ -124,6 +134,9 @@ struct ClickhouseEventRecordBuilder {
     attrs: HashSet<(String, String)>,
 }
 
+/// `ClickhouseEventRecordBuilder` ergonomic conversion from the `CommonEvent`
+/// trait. This takes care of the core data fields of `api_key`, `site`, `id`
+/// and `ts`
 impl<T> From<&T> for ClickhouseEventRecordBuilder
 where
     T: CommonEvent,
