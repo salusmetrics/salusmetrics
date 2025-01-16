@@ -30,23 +30,39 @@ pub enum IngestEvent {
 
 /// `ApiKey` newtype wrapper for the api_key string
 #[derive(Debug, Clone)]
-pub struct ApiKey(pub String);
+pub struct ApiKey {
+    api_key: String,
+}
 
 impl ApiKey {
     /// `ApiKey` constructor
     pub fn new(key: impl AsRef<str>) -> Self {
-        Self(key.as_ref().to_owned())
+        Self {
+            api_key: key.as_ref().to_owned(),
+        }
+    }
+    /// Provide access to the api_key value
+    pub fn value(&self) -> &String {
+        &self.api_key
     }
 }
 
 /// `Site` newtype wrapper for the site an event is coming from
 #[derive(Debug, Clone)]
-pub struct Site(pub String);
+pub struct Site {
+    site: String,
+}
 
 impl Site {
     /// `Site` constructor
     pub fn new(site: impl AsRef<str>) -> Self {
-        Self(site.as_ref().to_owned())
+        Self {
+            site: site.as_ref().to_owned(),
+        }
+    }
+    /// provide access to the site value
+    pub fn value(&self) -> &String {
+        &self.site
     }
 }
 

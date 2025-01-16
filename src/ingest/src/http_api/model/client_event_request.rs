@@ -126,8 +126,8 @@ impl TryFrom<&ClientEventRequest> for VisitorEvent {
         );
 
         VisitorEvent::try_new(
-            ApiKey(value.headers.api_key.to_owned()),
-            Site(value.headers.site.to_owned()),
+            ApiKey::new(&value.headers.api_key),
+            Site::new(&value.headers.site),
             value.body.id,
         )
         .map_err(|e| e.into())
@@ -149,8 +149,8 @@ impl TryFrom<&ClientEventRequest> for SessionEvent {
         let parent_uuid =
             Uuid::parse_str(parent).map_err(|_| ClientEventRequestError::InvalidRequestBody)?;
         SessionEvent::try_new(
-            ApiKey(value.headers.api_key.to_owned()),
-            Site(value.headers.site.to_owned()),
+            ApiKey::new(&value.headers.api_key),
+            Site::new(&value.headers.site),
             value.body.id,
             parent_uuid,
         )
@@ -173,8 +173,8 @@ impl TryFrom<&ClientEventRequest> for SectionEvent {
         let parent_uuid =
             Uuid::parse_str(parent).map_err(|_| ClientEventRequestError::InvalidRequestBody)?;
         SectionEvent::try_new(
-            ApiKey(value.headers.api_key.to_owned()),
-            Site(value.headers.site.to_owned()),
+            ApiKey::new(&value.headers.api_key),
+            Site::new(&value.headers.site),
             value.body.id,
             parent_uuid,
         )
@@ -197,8 +197,8 @@ impl TryFrom<&ClientEventRequest> for ClickEvent {
         let parent_uuid =
             Uuid::parse_str(parent).map_err(|_| ClientEventRequestError::InvalidRequestBody)?;
         ClickEvent::try_new(
-            ApiKey(value.headers.api_key.to_owned()),
-            Site(value.headers.site.to_owned()),
+            ApiKey::new(&value.headers.api_key),
+            Site::new(&value.headers.site),
             value.body.id,
             parent_uuid,
         )

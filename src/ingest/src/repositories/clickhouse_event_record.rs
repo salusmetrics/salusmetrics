@@ -143,8 +143,8 @@ where
 {
     fn from(event: &T) -> Self {
         Self {
-            api_key: event.api_key().0.to_owned(),
-            site: event.site().0.to_owned(),
+            api_key: event.api_key().value().to_owned(),
+            site: event.site().value().to_owned(),
             id: event.id().to_owned(),
             ts: event.ts().to_owned(),
             event_type: None,
@@ -230,8 +230,8 @@ mod tests {
     fn test_try_from_ingest_event() {
         let uuid_visitor = Uuid::now_v7();
         let Ok(valid_visitor_event) = VisitorEvent::try_new(
-            ApiKey("abc-124".to_owned()),
-            Site("http://salusmetrics.com".to_owned()),
+            ApiKey::new("abc-124"),
+            Site::new("http://salusmetrics.com"),
             uuid_visitor,
         ) else {
             panic!("Expected valid VisitorEvent to be created");
@@ -243,8 +243,8 @@ mod tests {
 
         let uuid_session = Uuid::now_v7();
         let Ok(valid_session_event) = SessionEvent::try_new(
-            ApiKey("abc-124".to_owned()),
-            Site("http://salusmetrics.com".to_owned()),
+            ApiKey::new("abc-124"),
+            Site::new("http://salusmetrics.com"),
             uuid_session,
             uuid_visitor,
         ) else {
@@ -257,8 +257,8 @@ mod tests {
 
         let uuid_section = Uuid::now_v7();
         let Ok(valid_section_event) = SectionEvent::try_new(
-            ApiKey("abc-124".to_owned()),
-            Site("http://salusmetrics.com".to_owned()),
+            ApiKey::new("abc-124"),
+            Site::new("http://salusmetrics.com"),
             uuid_section,
             uuid_session,
         ) else {
@@ -271,8 +271,8 @@ mod tests {
 
         let uuid_click = Uuid::now_v7();
         let Ok(valid_click_event) = ClickEvent::try_new(
-            ApiKey("abc-124".to_owned()),
-            Site("http://salusmetrics.com".to_owned()),
+            ApiKey::new("abc-124"),
+            Site::new("http://salusmetrics.com"),
             uuid_click,
             uuid_section,
         ) else {
