@@ -7,14 +7,21 @@ use crate::domain::{
     repository::ingest_event_repository::IngestRepositoryError,
 };
 
-/// Represent potential error cases for an IngestEventService action
+/// `IngestServiceError` represents potential error cases for an
+/// `IngestEventService` action.
 #[derive(Clone, Error, Debug, PartialEq, Eq)]
 pub enum IngestServiceError {
+    /// `Save` allows underlying `IngestRepositoryError` errors to be
+    /// handled at the service level
     #[error("Error saving IngestEvent")]
     Save(#[from] IngestRepositoryError),
 }
 
+/// `IngestEventService` trait provides the service interface for
+/// various `IngestEvent` actions
 pub trait IngestEventService: 'static + Send + Sync {
+    /// `save` a `Vec` of `IngestEvents` to the associated
+    /// `IngestEventRepository`
     fn save(
         &self,
         events: Vec<IngestEvent>,

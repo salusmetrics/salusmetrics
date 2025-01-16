@@ -7,7 +7,6 @@ use uuid::Uuid;
 use crate::domain::model::ingest_event::ApiKey;
 use crate::domain::model::ingest_event::ClickEvent;
 use crate::domain::model::ingest_event::IngestEvent;
-use crate::domain::model::ingest_event::IngestEventCore;
 use crate::domain::model::ingest_event::IngestEventError;
 use crate::domain::model::ingest_event::SectionEvent;
 use crate::domain::model::ingest_event::SessionEvent;
@@ -96,19 +95,6 @@ impl TryFrom<&ClientEventRequest> for IngestEvent {
     }
 }
 
-impl<T> TryFrom<&ClientEventRequest> for IngestEventCore<T> {
-    type Error = ClientEventRequestError;
-
-    fn try_from(value: &ClientEventRequest) -> Result<Self, Self::Error> {
-        Self::try_new(
-            ApiKey(value.headers.api_key.to_owned()),
-            Site(value.headers.site.to_owned()),
-            value.body.id.to_owned(),
-        )
-        .map_err(|e| e.into())
-    }
-}
-
 impl TryFrom<&ClientEventRequest> for VisitorEvent {
     type Error = ClientEventRequestError;
     fn try_from(value: &ClientEventRequest) -> Result<Self, Self::Error> {
@@ -117,8 +103,12 @@ impl TryFrom<&ClientEventRequest> for VisitorEvent {
             "Attempted to build Visitor event from other type"
         );
 
-        let core: IngestEventCore<VisitorEvent> = value.try_into()?;
-        VisitorEvent::try_new_with_core_event(core).map_err(|e| e.into())
+        VisitorEvent::try_new(
+            ApiKey(value.headers.api_key.to_owned()),
+            Site(value.headers.site.to_owned()),
+            value.body.id,
+        )
+        .map_err(|e| e.into())
     }
 }
 
@@ -130,13 +120,18 @@ impl TryFrom<&ClientEventRequest> for SessionEvent {
             "Attempted to build Session event from other type"
         );
 
-        let core: IngestEventCore<SessionEvent> = value.try_into()?;
         let parent = value
             .attr("parent")
             .ok_or(ClientEventRequestError::InvalidRequestBody)?;
         let parent_uuid =
             Uuid::parse_str(parent).map_err(|_| ClientEventRequestError::InvalidRequestBody)?;
-        SessionEvent::try_new_with_core_event(core, parent_uuid).map_err(|e| e.into())
+        SessionEvent::try_new(
+            ApiKey(value.headers.api_key.to_owned()),
+            Site(value.headers.site.to_owned()),
+            value.body.id,
+            parent_uuid,
+        )
+        .map_err(|e| e.into())
     }
 }
 
@@ -148,13 +143,18 @@ impl TryFrom<&ClientEventRequest> for SectionEvent {
             "Attempted to build Section event from other type"
         );
 
-        let core: IngestEventCore<SectionEvent> = value.try_into()?;
         let parent = value
             .attr("parent")
             .ok_or(ClientEventRequestError::InvalidRequestBody)?;
         let parent_uuid =
             Uuid::parse_str(parent).map_err(|_| ClientEventRequestError::InvalidRequestBody)?;
-        SectionEvent::try_new_with_core_event(core, parent_uuid).map_err(|e| e.into())
+        SectionEvent::try_new(
+            ApiKey(value.headers.api_key.to_owned()),
+            Site(value.headers.site.to_owned()),
+            value.body.id,
+            parent_uuid,
+        )
+        .map_err(|e| e.into())
     }
 }
 
@@ -166,13 +166,18 @@ impl TryFrom<&ClientEventRequest> for ClickEvent {
             "Attempted to build Click event from other type"
         );
 
-        let core: IngestEventCore<ClickEvent> = value.try_into()?;
         let parent = value
             .attr("parent")
             .ok_or(ClientEventRequestError::InvalidRequestBody)?;
         let parent_uuid =
             Uuid::parse_str(parent).map_err(|_| ClientEventRequestError::InvalidRequestBody)?;
-        ClickEvent::try_new_with_core_event(core, parent_uuid).map_err(|e| e.into())
+        ClickEvent::try_new(
+            ApiKey(value.headers.api_key.to_owned()),
+            Site(value.headers.site.to_owned()),
+            value.body.id,
+            parent_uuid,
+        )
+        .map_err(|e| e.into())
     }
 }
 

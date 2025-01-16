@@ -1,13 +1,12 @@
-use std::marker::PhantomData;
-
 use thiserror::Error;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
 use crate::domain::model::util::{is_ts_within_ingest_range, try_uuid_datetime};
 
-/// Represent potential error cases for an IngestEvent, either due to data
-/// correctness issues or due to system availability problems.
+/// `IngestEventError` represents the  potential domain error cases for
+/// `IngestEvent`. This is strictly due to domain rules, not infrastructure
+/// related issues.
 #[derive(Clone, Error, Debug, PartialEq, Eq)]
 pub enum IngestEventError {
     #[error("Timestamp from UUID beyond acceptable range for new event")]
@@ -51,40 +50,17 @@ impl Site {
     }
 }
 
-/// `IngestEventCore` represents the common fields that all events have like
-/// `api_key`, `id` and `ts`.
-///
-/// Note that the timestamp, `ts` for the event is strictly derived from the
-/// `id` field which must be a UUIDv7 or else the construction of this struct
-/// will result in an error. Additionally, the associeated timestamp for any
-/// given ingestion event must be within a specified duration of now, or else
-/// an error will be returned during attempted construction.
-#[derive(Debug, Clone)]
-pub struct IngestEventCore<T> {
-    pub api_key: ApiKey,
-    pub site: Site,
-    pub id: Uuid,
-    pub ts: OffsetDateTime,
-    _event_type: PhantomData<T>,
-}
-
-impl<T> IngestEventCore<T> {
-    /// `IngestEventCore` constructor
-    pub fn try_new(api_key: ApiKey, site: Site, id: Uuid) -> Result<Self, IngestEventError> {
-        let ts = try_uuid_datetime(&id)?;
-
-        if is_ts_within_ingest_range(&ts) {
-            Ok(Self {
-                api_key,
-                site,
-                id,
-                ts,
-                _event_type: PhantomData,
-            })
-        } else {
-            Err(IngestEventError::TimestampOutOfRange)
-        }
-    }
+/// `CommonEvent` trait is used to represent the common attributes that all
+/// event types must have in order to be valid.
+pub trait CommonEvent {
+    /// Retrieve the `ApiKey` for this event
+    fn api_key(&self) -> &ApiKey;
+    /// Retrieve the `Site` for this event
+    fn site(&self) -> &Site;
+    /// Retrieve the `Uuid` id for this event
+    fn id(&self) -> Uuid;
+    /// Retrieve the `OffsetDateTime` timestamp for this event
+    fn ts(&self) -> &OffsetDateTime;
 }
 
 /// `VisitorEvent` represents a an event where an unrecognized user begins to
@@ -92,8 +68,35 @@ impl<T> IngestEventCore<T> {
 /// events are based.
 #[derive(Debug, Clone)]
 pub struct VisitorEvent {
-    pub core: IngestEventCore<Self>,
+    /// `api_key` that ties this event to a particular client and site
+    api_key: ApiKey,
+    /// `site` is the site from which this event is coming. i.e. www.test.com
+    site: Site,
+    /// `id` is a `Uuid` that must be a UUIDv7 and must have an associated
+    /// timestamp within a certain range of now in order to be considered valid
+    /// for ingestion.
+    id: Uuid,
+    /// `ts` is the timestamp, represented as a
+    /// `time::offset_date_time::OffsetDateTime` value. This is strictly derived
+    /// from the `id` field above
+    ts: OffsetDateTime,
 }
+
+impl CommonEvent for &VisitorEvent {
+    fn api_key(&self) -> &ApiKey {
+        &self.api_key
+    }
+    fn id(&self) -> Uuid {
+        self.id
+    }
+    fn site(&self) -> &Site {
+        &self.site
+    }
+    fn ts(&self) -> &OffsetDateTime {
+        &self.ts
+    }
+}
+
 impl VisitorEvent {
     /// `VisitorEvent` all field constructor
     pub fn try_new(api_key: ApiKey, site: Site, id: Uuid) -> Result<Self, IngestEventError> {
@@ -102,16 +105,50 @@ impl VisitorEvent {
 
     /// `VisitorEvent` constructor with `IngestEventCore` already created for
     /// convenience or ergonomics
-    pub fn try_new_with_core_event(core: IngestEventCore<Self>) -> Result<Self, IngestEventError> {
-        Ok(Self { core })
+    fn try_new_with_core_event(core: IngestEventCore) -> Result<Self, IngestEventError> {
+        Ok(Self {
+            api_key: core.api_key,
+            id: core.id,
+            site: core.site,
+            ts: core.ts,
+        })
     }
 }
 
+/// `SessionEvent` represents a new session start for an established `Visitor`
 #[derive(Debug, Clone)]
 pub struct SessionEvent {
-    pub core: IngestEventCore<Self>,
-    pub parent: Uuid,
+    /// `api_key` that ties this event to a particular client and site
+    api_key: ApiKey,
+    /// `site` is the site from which this event is coming. i.e. www.test.com
+    site: Site,
+    /// `id` is a `Uuid` that must be a UUIDv7 and must have an associated
+    /// timestamp within a certain range of now in order to be considered valid
+    /// for ingestion.
+    id: Uuid,
+    /// `ts` is the timestamp, represented as a
+    /// `time::offset_date_time::OffsetDateTime` value. This is strictly derived
+    /// from the `id` field above
+    ts: OffsetDateTime,
+    /// `parent` identifies the `Visitor` which this session is associated with
+    parent: Uuid,
 }
+
+impl CommonEvent for &SessionEvent {
+    fn api_key(&self) -> &ApiKey {
+        &self.api_key
+    }
+    fn id(&self) -> Uuid {
+        self.id
+    }
+    fn site(&self) -> &Site {
+        &self.site
+    }
+    fn ts(&self) -> &OffsetDateTime {
+        &self.ts
+    }
+}
+
 impl SessionEvent {
     /// `SessionEvent` all field constructor
     pub fn try_new(
@@ -125,19 +162,63 @@ impl SessionEvent {
 
     /// `SessionEvent` constructor with `IngestEventCore` already created for
     /// convenience or ergonomics
-    pub fn try_new_with_core_event(
-        core: IngestEventCore<Self>,
+    fn try_new_with_core_event(
+        core: IngestEventCore,
         parent: Uuid,
     ) -> Result<Self, IngestEventError> {
-        Ok(Self { core, parent })
+        Ok(Self {
+            api_key: core.api_key,
+            id: core.id,
+            site: core.site,
+            ts: core.ts,
+            parent,
+        })
+    }
+
+    /// Get the `Uuid` id for the parent `VisitorEvent` for this `SessionEvent`
+    pub fn parent(&self) -> Uuid {
+        self.parent
     }
 }
 
+/// `SectionEvent` represents an event for which the associated Visitor in a
+/// given Session has been shown a Section. For a conventional web site this
+/// would represent a page vend or page view. In a SPA this could mean that
+/// a screen has been rendered. For a mobile app this could be a screen, a modal
+/// or some other sort of interaction.
 #[derive(Debug, Clone)]
 pub struct SectionEvent {
-    pub core: IngestEventCore<Self>,
-    pub parent: Uuid,
+    /// `api_key` that ties this event to a particular client and site
+    api_key: ApiKey,
+    /// `site` is the site from which this event is coming. i.e. www.test.com
+    site: Site,
+    /// `id` is a `Uuid` that must be a UUIDv7 and must have an associated
+    /// timestamp within a certain range of now in order to be considered valid
+    /// for ingestion.
+    id: Uuid,
+    /// `ts` is the timestamp, represented as a
+    /// `time::offset_date_time::OffsetDateTime` value. This is strictly derived
+    /// from the `id` field above
+    ts: OffsetDateTime,
+    /// `parent` identifies the `Session` which this section is associated with
+    parent: Uuid,
 }
+
+impl CommonEvent for &SectionEvent {
+    fn api_key(&self) -> &ApiKey {
+        &self.api_key
+    }
+    fn id(&self) -> Uuid {
+        self.id
+    }
+    fn site(&self) -> &Site {
+        &self.site
+    }
+    fn ts(&self) -> &OffsetDateTime {
+        &self.ts
+    }
+}
+
 impl SectionEvent {
     /// `SectionEvent` all field constructor
     pub fn try_new(
@@ -151,19 +232,60 @@ impl SectionEvent {
 
     /// `SectionEvent` constructor with `IngestEventCore` already created for
     /// convenience or ergonomics
-    pub fn try_new_with_core_event(
-        core: IngestEventCore<Self>,
+    fn try_new_with_core_event(
+        core: IngestEventCore,
         parent: Uuid,
     ) -> Result<Self, IngestEventError> {
-        Ok(Self { core, parent })
+        Ok(Self {
+            api_key: core.api_key,
+            id: core.id,
+            site: core.site,
+            ts: core.ts,
+            parent,
+        })
+    }
+
+    /// Get the `Uuid` id for the parent `SessionEvent` for this `SectionEvent`
+    pub fn parent(&self) -> Uuid {
+        self.parent
     }
 }
 
+/// `ClickEvent` represents a user clicking or otherwise interacting with any
+/// particular element in the interface of an associated Section.
 #[derive(Debug, Clone)]
 pub struct ClickEvent {
-    pub core: IngestEventCore<Self>,
-    pub parent: Uuid,
+    /// `api_key` that ties this event to a particular client and site
+    api_key: ApiKey,
+    /// `site` is the site from which this event is coming. i.e. www.test.com
+    site: Site,
+    /// `id` is a `Uuid` that must be a UUIDv7 and must have an associated
+    /// timestamp within a certain range of now in order to be considered valid
+    /// for ingestion.
+    id: Uuid,
+    /// `ts` is the timestamp, represented as a
+    /// `time::offset_date_time::OffsetDateTime` value. This is strictly derived
+    /// from the `id` field above
+    ts: OffsetDateTime,
+    /// `parent` identifies the `Section` which this click is associated with
+    parent: Uuid,
 }
+
+impl CommonEvent for &ClickEvent {
+    fn api_key(&self) -> &ApiKey {
+        &self.api_key
+    }
+    fn id(&self) -> Uuid {
+        self.id
+    }
+    fn site(&self) -> &Site {
+        &self.site
+    }
+    fn ts(&self) -> &OffsetDateTime {
+        &self.ts
+    }
+}
+
 impl ClickEvent {
     /// `ClickEvent` all field constructor
     pub fn try_new(
@@ -177,11 +299,65 @@ impl ClickEvent {
 
     /// `ClickEvent` constructor with `IngestEventCore` already created for
     /// convenience or ergonomics
-    pub fn try_new_with_core_event(
-        core: IngestEventCore<Self>,
+    fn try_new_with_core_event(
+        core: IngestEventCore,
         parent: Uuid,
     ) -> Result<Self, IngestEventError> {
-        Ok(Self { core, parent })
+        Ok(Self {
+            api_key: core.api_key,
+            id: core.id,
+            site: core.site,
+            ts: core.ts,
+            parent,
+        })
+    }
+
+    /// Get the `Uuid` id for the parent `SectionEvent` for this `ClickEvent`
+    pub fn parent(&self) -> Uuid {
+        self.parent
+    }
+}
+
+/// `IngestEventCore` represents the common fields that all events have like
+/// `api_key`, `id` and `ts`.
+///
+/// Note that the timestamp, `ts` for the event is strictly derived from the
+/// `id` field which must be a UUIDv7 or else the construction of this struct
+/// will result in an error. Additionally, the associeated timestamp for any
+/// given ingestion event must be within a specified duration of now, or else
+/// an error will be returned during attempted construction.
+#[derive(Debug, Clone)]
+struct IngestEventCore {
+    /// `api_key` that ties this event to a particular client and site
+    api_key: ApiKey,
+    /// `site` is the site from which this event is coming. i.e. www.test.com
+    site: Site,
+    /// `id` is a `Uuid` that must be a UUIDv7 and must have an associated
+    /// timestamp within a certain range of now in order to be considered valid
+    /// for ingestion.
+    id: Uuid,
+    /// `ts` is the timestamp, represented as a
+    /// `time::offset_date_time::OffsetDateTime` value. This is strictly derived
+    /// from the `id` field above
+    ts: OffsetDateTime,
+}
+
+impl IngestEventCore {
+    /// `IngestEventCore` constructor. Enforces domain rules with regard to
+    /// `id` UUID type as well as the allowed range of times for events.
+    pub fn try_new(api_key: ApiKey, site: Site, id: Uuid) -> Result<Self, IngestEventError> {
+        let ts = try_uuid_datetime(id)?;
+
+        if is_ts_within_ingest_range(&ts) {
+            Ok(Self {
+                api_key,
+                site,
+                id,
+                ts,
+            })
+        } else {
+            Err(IngestEventError::TimestampOutOfRange)
+        }
     }
 }
 
@@ -199,13 +375,13 @@ mod tests {
     fn test_try_new_events() {
         let uuid_now = Uuid::now_v7();
         let (ts_now, _) = uuid_now.get_timestamp().unwrap().to_unix();
-        let test_core: Result<IngestEventCore<VisitorEvent>, IngestEventError> =
+        let test_core: Result<IngestEventCore, IngestEventError> =
             IngestEventCore::try_new(ApiKey::new(API_KEY_STR), Site::new(SITE), uuid_now);
         let Ok(_) = test_core else {
             panic!("Expected valid IngestEventCore");
         };
 
-        let invalid_ingest_uuid_type: Result<IngestEventCore<SessionEvent>, IngestEventError> =
+        let invalid_ingest_uuid_type: Result<IngestEventCore, IngestEventError> =
             IngestEventCore::try_new(
                 ApiKey::new(API_KEY_STR),
                 Site::new(SITE),
@@ -216,7 +392,7 @@ mod tests {
             IngestEventError::UuidVersion
         );
 
-        let invalid_ingest_event_early: Result<IngestEventCore<SectionEvent>, IngestEventError> =
+        let invalid_ingest_event_early: Result<IngestEventCore, IngestEventError> =
             IngestEventCore::try_new(
                 ApiKey::new(API_KEY_STR),
                 Site::new(SITE),
@@ -227,7 +403,7 @@ mod tests {
             IngestEventError::TimestampOutOfRange
         );
 
-        let invalid_ingest_event_late: Result<IngestEventCore<ClickEvent>, IngestEventError> =
+        let invalid_ingest_event_late: Result<IngestEventCore, IngestEventError> =
             IngestEventCore::try_new(
                 ApiKey::new(API_KEY_STR),
                 Site::new(SITE),

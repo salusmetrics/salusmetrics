@@ -13,7 +13,6 @@ use ingest::http_api::model::ingest_application_state::IngestApplicationState;
 use ingest::repositories::clickhouse_ingest_repository::ClickhouseIngestRepository;
 use ingest::services::ingest_service::IngestService;
 use std::collections::HashMap;
-// use ingest::event_record::EventRecord;
 use std::error::Error;
 use tower_http::cors::Any;
 use tower_http::trace::TraceLayer;
@@ -68,70 +67,6 @@ async fn main() -> Result<(), Box<dyn Error + 'static>> {
         .unwrap();
     Ok(())
 }
-
-// async fn test_multi_ingest(
-//     State(app_state): State<CommonAppState>,
-//     headers: HeaderMap,
-//     Json(event_bodies): Json<Vec<ClientEventRequestBody>>,
-// ) -> impl IntoResponse {
-//     let Ok(event_headers) = ClientEventHeaders::try_from(&headers) else {
-//         return StatusCode::BAD_REQUEST;
-//     };
-
-//     let mut events: Vec<ClientEvent> = Vec::with_capacity(event_bodies.len());
-//     for eb in event_bodies.iter() {
-//         let Ok(ce) = ClientEvent::try_new_from_headers_body(&event_headers, eb) else {
-//             return StatusCode::BAD_REQUEST;
-//         };
-//         events.push(ce);
-//     }
-//     let event_records: Vec<EventRecord> = events.iter().map(EventRecord::from).collect();
-//     tracing::debug!("records: {event_records:?}");
-
-//     let client = app_state.metrics_db_client;
-//     let Ok(mut insert) = client.insert::<EventRecord>("EVENT") else {
-//         return StatusCode::BAD_REQUEST;
-//     };
-
-//     for er in event_records.iter() {
-//         if insert.write(er).await.is_err() {
-//             return StatusCode::BAD_REQUEST;
-//         }
-//     }
-//     if insert.end().await.is_err() {
-//         return StatusCode::BAD_REQUEST;
-//     }
-//     StatusCode::OK
-// }
-
-// async fn test_ingest(
-//     State(app_state): State<CommonAppState>,
-//     headers: HeaderMap,
-//     Json(event): Json<ClientEventRequestBody>,
-// ) -> impl IntoResponse {
-//     let Ok(event_headers) = ClientEventHeaders::try_from(&headers) else {
-//         return StatusCode::BAD_REQUEST;
-//     };
-//     let Ok(event) = ClientEvent::try_new_from_headers_body(&event_headers, &event) else {
-//         return StatusCode::BAD_REQUEST;
-//     };
-//     let record = EventRecord::from(&event);
-
-//     tracing::debug!("record: {record:?}");
-
-//     let client = app_state.metrics_db_client;
-//     let Ok(mut insert) = client.insert("EVENT") else {
-//         return StatusCode::BAD_REQUEST;
-//     };
-
-//     if insert.write(&record).await.is_err() {
-//         return StatusCode::BAD_REQUEST;
-//     }
-//     if insert.end().await.is_err() {
-//         return StatusCode::BAD_REQUEST;
-//     }
-//     StatusCode::OK
-// }
 
 #[instrument]
 async fn explore() -> impl IntoResponse {

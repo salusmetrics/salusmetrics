@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use clickhouse::Row;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -6,12 +8,13 @@ use uuid::Uuid;
 
 use crate::domain::{
     model::ingest_event::{
-        ClickEvent, IngestEvent, IngestEventCore, SectionEvent, SessionEvent, VisitorEvent,
+        ClickEvent, CommonEvent, IngestEvent, SectionEvent, SessionEvent, VisitorEvent,
     },
     repository::ingest_event_repository::IngestRepositoryError,
 };
 
-/// Type of analytics event - maps to ClickHouse Enum8 with identical values
+/// `ClickhouseEventRecordType` represents the type of analytics event - maps
+/// to ClickHouse Enum8 with identical values.
 /// See definition of table `SALUS_METRICS.EVENT` and field `event_type`
 #[derive(Debug, Deserialize_repr, PartialEq, Eq, PartialOrd, Ord, Serialize_repr, Clone)]
 #[repr(u8)]
@@ -34,9 +37,13 @@ impl From<&IngestEvent> for ClickhouseEventRecordType {
 }
 
 /// Represents the data that will actually be inserted into ClickHouse in the
-/// SALUS_METRICS.EVENT table. Expected usages is to call
-/// InsertIngestEvent::from_ingest_event on a IngestEvent that has been
-/// received.
+/// SALUS_METRICS.EVENT table.
+/// Note that this representation differs from the `IngestEvent` domain struct
+/// in numerous ways, but also strongly differs from the HTTP representation
+/// that is specified in `ClientEventRequest`. The biggest reason for this is
+/// because all events persisted to ClickHouse start off as records in a
+/// the `EVENT` table and thus have to store all non-common attributes in
+/// a (String, String) tuple.
 #[derive(Debug, Row, Deserialize, Serialize, Clone)]
 pub struct ClickhouseEventRecord {
     api_key: String,
@@ -64,7 +71,7 @@ impl TryFrom<&IngestEvent> for ClickhouseEventRecord {
 impl TryFrom<&VisitorEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
     fn try_from(event: &VisitorEvent) -> Result<Self, Self::Error> {
-        let builder = ClickhouseEventRecordBuilder::from(&event.core);
+        let builder = ClickhouseEventRecordBuilder::from(&event);
         builder
             .event_type(ClickhouseEventRecordType::Visitor)
             .try_build()
@@ -74,10 +81,10 @@ impl TryFrom<&VisitorEvent> for ClickhouseEventRecord {
 impl TryFrom<&SessionEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
     fn try_from(event: &SessionEvent) -> Result<Self, Self::Error> {
-        let builder = ClickhouseEventRecordBuilder::from(&event.core);
+        let builder = ClickhouseEventRecordBuilder::from(&event);
         builder
             .event_type(ClickhouseEventRecordType::Session)
-            .add_parent(event.parent)
+            .parent(event.parent())
             .try_build()
     }
 }
@@ -85,10 +92,10 @@ impl TryFrom<&SessionEvent> for ClickhouseEventRecord {
 impl TryFrom<&SectionEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
     fn try_from(event: &SectionEvent) -> Result<Self, Self::Error> {
-        let builder = ClickhouseEventRecordBuilder::from(&event.core);
+        let builder = ClickhouseEventRecordBuilder::from(&event);
         builder
-            .event_type(ClickhouseEventRecordType::Section)
-            .add_parent(event.parent)
+            .event_type(ClickhouseEventRecordType::Session)
+            .parent(event.parent())
             .try_build()
     }
 }
@@ -96,59 +103,77 @@ impl TryFrom<&SectionEvent> for ClickhouseEventRecord {
 impl TryFrom<&ClickEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
     fn try_from(event: &ClickEvent) -> Result<Self, Self::Error> {
-        let builder = ClickhouseEventRecordBuilder::from(&event.core);
+        let builder = ClickhouseEventRecordBuilder::from(&event);
         builder
             .event_type(ClickhouseEventRecordType::Click)
-            .add_parent(event.parent)
+            .parent(event.parent())
             .try_build()
     }
 }
 
+/// `ClickhouseEventRecordBuilder` is an internal struct used to build up a
+/// `ClickhouseEventRecord` in an ergonomic way. Part of this relies on the
+/// `CommonEvent` trait that is provided in the domain to represent the fields
+/// that all event types must have in order to be saved.
 struct ClickhouseEventRecordBuilder {
     api_key: String,
     site: String,
     id: Uuid,
     ts: OffsetDateTime,
     event_type: Option<ClickhouseEventRecordType>,
-    attrs: Vec<(String, String)>,
+    attrs: HashSet<(String, String)>,
 }
 
-impl<T> From<&IngestEventCore<T>> for ClickhouseEventRecordBuilder {
-    fn from(event: &IngestEventCore<T>) -> Self {
+impl<T> From<&T> for ClickhouseEventRecordBuilder
+where
+    T: CommonEvent,
+{
+    fn from(event: &T) -> Self {
         Self {
-            api_key: event.api_key.0.to_owned(),
-            site: event.site.0.to_owned(),
-            id: event.id.to_owned(),
-            ts: event.ts.to_owned(),
+            api_key: event.api_key().0.to_owned(),
+            site: event.site().0.to_owned(),
+            id: event.id().to_owned(),
+            ts: event.ts().to_owned(),
             event_type: None,
-            attrs: Vec::new(),
+            attrs: HashSet::new(),
         }
     }
 }
 
 impl ClickhouseEventRecordBuilder {
+    /// Set the `event_type` `ClickhouseEventRecordType` for the eventual
+    /// `ClickhouseEventRecord`
     fn event_type(mut self, event_type: ClickhouseEventRecordType) -> Self {
         self.event_type = Some(event_type);
         self
     }
 
-    fn add_parent(self, parent: Uuid) -> Self {
+    /// Set the `parent` field on the eventual `ClickhouseEventRecord`
+    fn parent(self, parent: Uuid) -> Self {
         self.add_attr("parent".to_owned(), parent.to_string())
     }
 
+    /// Helper method to add an arbitrarily named attribute to the eventual
+    /// `ClickhouseEventRecord`
     fn add_attr(mut self, key: String, value: String) -> Self {
-        self.attrs.push((key, value));
+        self.attrs.insert((key, value));
         self
     }
 
+    /// Attempt to actually create the `ClickhouseEventRecord` from this
+    /// `ClickhouseEventRecordBuilder`
     fn try_build(self) -> Result<ClickhouseEventRecord, IngestRepositoryError> {
+        // let attrs: Vec<(String, String)> = HashSet::with_capacity(self.attrs.len());
+        // for pair in self.attrs.iter() {
+        //     attrs.push(pair);
+        // }
         Ok(ClickhouseEventRecord {
             api_key: self.api_key,
             site: self.site,
             event_type: self.event_type.ok_or(IngestRepositoryError::Conversion)?,
             id: self.id,
             ts: self.ts,
-            attrs: self.attrs,
+            attrs: self.attrs.into_iter().collect(),
         })
     }
 }
@@ -190,17 +215,58 @@ mod tests {
 
     #[test]
     fn test_try_from_ingest_event() {
-        let uuid_now = Uuid::now_v7();
+        let uuid_visitor = Uuid::now_v7();
         let Ok(valid_visitor_event) = VisitorEvent::try_new(
             ApiKey("abc-124".to_owned()),
             Site("http://salusmetrics.com".to_owned()),
-            uuid_now,
+            uuid_visitor,
         ) else {
             panic!("Expected valid VisitorEvent to be created");
         };
         let Ok(_) = ClickhouseEventRecord::try_from(&IngestEvent::Visitor(valid_visitor_event))
         else {
-            panic!("Expected valid ClickhouseEventRecord to be created from valid event");
+            panic!("Expected valid Visitor ClickhouseEventRecord to be created from valid event");
+        };
+
+        let uuid_session = Uuid::now_v7();
+        let Ok(valid_session_event) = SessionEvent::try_new(
+            ApiKey("abc-124".to_owned()),
+            Site("http://salusmetrics.com".to_owned()),
+            uuid_session,
+            uuid_visitor,
+        ) else {
+            panic!("Expected valid SessionEvent to be created");
+        };
+        let Ok(_) = ClickhouseEventRecord::try_from(&IngestEvent::Session(valid_session_event))
+        else {
+            panic!("Expected valid Session ClickhouseEventRecord to be created from valid event");
+        };
+
+        let uuid_section = Uuid::now_v7();
+        let Ok(valid_section_event) = SectionEvent::try_new(
+            ApiKey("abc-124".to_owned()),
+            Site("http://salusmetrics.com".to_owned()),
+            uuid_section,
+            uuid_session,
+        ) else {
+            panic!("Expected valid SectionEvent to be created");
+        };
+        let Ok(_) = ClickhouseEventRecord::try_from(&IngestEvent::Section(valid_section_event))
+        else {
+            panic!("Expected valid Section ClickhouseEventRecord to be created from valid event");
+        };
+
+        let uuid_click = Uuid::now_v7();
+        let Ok(valid_click_event) = ClickEvent::try_new(
+            ApiKey("abc-124".to_owned()),
+            Site("http://salusmetrics.com".to_owned()),
+            uuid_click,
+            uuid_section,
+        ) else {
+            panic!("Expected valid ClickEvent to be created");
+        };
+        let Ok(_) = ClickhouseEventRecord::try_from(&IngestEvent::Click(valid_click_event)) else {
+            panic!("Expected valid Click ClickhouseEventRecord to be created from valid event");
         };
     }
 }

@@ -16,7 +16,7 @@ const MAX_DURATION_AFTER_PRESENT: Duration = Duration::minutes(5);
 /// Additionally, the difference in handling of UNIX timestamps can cause
 /// errors if the u64 cannot be properly converted to i64 or if the value
 /// is out of the component range of the OffsetDateTime crate.
-pub(crate) fn try_uuid_datetime(uuid: &Uuid) -> Result<OffsetDateTime, IngestEventError> {
+pub(crate) fn try_uuid_datetime(uuid: Uuid) -> Result<OffsetDateTime, IngestEventError> {
     let (sec, _) = uuid
         .get_timestamp()
         .ok_or(IngestEventError::UuidVersion)?
@@ -51,13 +51,13 @@ mod tests {
     fn test_try_uuid_datetime() {
         //  Test a valid case with a v7 UUID from now
         let uuid = Uuid::now_v7();
-        let odt = try_uuid_datetime(&uuid);
+        let odt = try_uuid_datetime(uuid);
         assert!(odt.is_ok());
 
         // Test invalid type that is v4
         let uuid = Uuid::parse_str(UUID_V4_STR).unwrap();
         assert_eq!(
-            try_uuid_datetime(&uuid).unwrap_err(),
+            try_uuid_datetime(uuid).unwrap_err(),
             IngestEventError::UuidVersion
         );
     }
