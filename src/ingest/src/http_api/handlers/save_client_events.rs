@@ -1,4 +1,5 @@
 use axum::{extract::State, Json};
+use tracing::instrument;
 
 use crate::{
     domain::{model::ingest_event::IngestEvent, service::ingest_event_service::IngestEventService},
@@ -14,8 +15,10 @@ use crate::{
 /// a list of `ClientEventRequestBody` structs as well as information in the
 /// HTTP headers which can be used to determine the `api_key` and the `site`
 /// for the incoming request. `site` is determined in a simple fashion by
-/// examining the referrer attribute, whereas
-pub async fn save_client_events<I: IngestEventService>(
+/// examining the referrer attribute, whereas the api_key uses a custom header
+/// as specified in `client_event_request_components::API_KEY_HTTP_HEADER`
+#[instrument]
+pub async fn save_client_events<I: IngestEventService + std::fmt::Debug>(
     State(state): State<IngestApplicationState<I>>,
     client_request_headers: ClientEventRequestHeaders,
     Json(event_bodies): Json<Vec<ClientEventRequestBody>>,

@@ -1,4 +1,5 @@
 use clickhouse::Client;
+use tracing::instrument;
 
 use crate::domain::model::ingest_action_summary::{IngestActionSummary, IngestEventSaveSummary};
 use crate::domain::model::ingest_event::IngestEvent;
@@ -20,6 +21,12 @@ pub struct ClickhouseIngestRepository {
     metrics_db_client: Client,
 }
 
+impl std::fmt::Debug for ClickhouseIngestRepository {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClickhouseIngestRepository").finish()
+    }
+}
+
 impl ClickhouseIngestRepository {
     pub fn new(metrics_db_client: Client) -> Self {
         Self { metrics_db_client }
@@ -29,6 +36,7 @@ impl ClickhouseIngestRepository {
 impl IngestEventRepository for ClickhouseIngestRepository {
     /// `save` method for ClickHouse puts all events into a common table called
     /// `EVENT` which is then used to populate all other metrics tables.
+    #[instrument]
     async fn save(
         &self,
         events: Vec<IngestEvent>,
@@ -45,6 +53,7 @@ impl IngestEventRepository for ClickhouseIngestRepository {
                 tracing::error!("Encountered error initiating ClickHouse Insert: {e}");
                 IngestRepositoryError::Repository
             })?;
+
         for record in records.iter() {
             insert.write(record).await.map_err(|e| {
                 tracing::error!("Encountered error inserting records: {e}");

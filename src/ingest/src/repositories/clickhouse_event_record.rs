@@ -4,6 +4,7 @@ use clickhouse::Row;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use time::OffsetDateTime;
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::domain::{
@@ -26,6 +27,7 @@ pub enum ClickhouseEventRecordType {
 }
 
 impl From<&IngestEvent> for ClickhouseEventRecordType {
+    #[instrument]
     fn from(value: &IngestEvent) -> Self {
         match value {
             IngestEvent::Visitor(_) => Self::Visitor,
@@ -60,6 +62,7 @@ pub struct ClickhouseEventRecord {
 /// model into something that can be persisted to the Clickhouse DB
 impl TryFrom<&IngestEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
+    #[instrument]
     fn try_from(value: &IngestEvent) -> Result<Self, Self::Error> {
         match value {
             IngestEvent::Visitor(event) => event.try_into(),
@@ -74,6 +77,7 @@ impl TryFrom<&IngestEvent> for ClickhouseEventRecord {
 /// `Visitor` discriminant
 impl TryFrom<&VisitorEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
+    #[instrument]
     fn try_from(event: &VisitorEvent) -> Result<Self, Self::Error> {
         let builder = ClickhouseEventRecordBuilder::from(&event);
         builder
@@ -86,6 +90,7 @@ impl TryFrom<&VisitorEvent> for ClickhouseEventRecord {
 /// `Session` discriminant
 impl TryFrom<&SessionEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
+    #[instrument]
     fn try_from(event: &SessionEvent) -> Result<Self, Self::Error> {
         let builder = ClickhouseEventRecordBuilder::from(&event);
         builder
@@ -99,6 +104,7 @@ impl TryFrom<&SessionEvent> for ClickhouseEventRecord {
 /// `Section` discriminant
 impl TryFrom<&SectionEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
+    #[instrument]
     fn try_from(event: &SectionEvent) -> Result<Self, Self::Error> {
         let builder = ClickhouseEventRecordBuilder::from(&event);
         builder
@@ -112,6 +118,7 @@ impl TryFrom<&SectionEvent> for ClickhouseEventRecord {
 /// `Click` discriminant
 impl TryFrom<&ClickEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
+    #[instrument]
     fn try_from(event: &ClickEvent) -> Result<Self, Self::Error> {
         let builder = ClickhouseEventRecordBuilder::from(&event);
         builder

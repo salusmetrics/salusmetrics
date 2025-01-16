@@ -206,13 +206,116 @@ impl TryFrom<&ClientEventRequest> for ClickEvent {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
+#[cfg(test)]
+mod tests {
 
-//     use super::*;
+    use std::collections::HashMap;
 
-//     #[test]
-//     fn test_try_from_client_request() {
+    use super::*;
+    use crate::domain::model::ingest_event::CommonEvent;
 
-//     }
-// }
+    pub const API_KEY: &str = "abc_123";
+    pub const SITE: &str = "test.com";
+    #[test]
+    fn test_try_from_client_request() {
+        let uuid_now = Uuid::now_v7();
+        let parent_id = Uuid::now_v7();
+
+        // Visitor
+        let valid_visitor_request = ClientEventRequest {
+            body: ClientEventRequestBody {
+                id: uuid_now,
+                event_type: ClientEventRequestType::Visitor,
+                attrs: None,
+            },
+            headers: ClientEventRequestHeaders {
+                api_key: API_KEY.to_owned(),
+                site: SITE.to_owned(),
+            },
+        };
+        let visitor_ingest_event: IngestEvent = (&valid_visitor_request).try_into().unwrap();
+        match visitor_ingest_event {
+            IngestEvent::Visitor(ref visitor_event) => {
+                assert_eq!(visitor_event.api_key().value(), API_KEY);
+                assert_eq!(visitor_event.site().value(), SITE);
+                assert_eq!(visitor_event.id(), uuid_now);
+            }
+            _ => panic!("Expected valid visitor event to be generated"),
+        }
+
+        // Session
+        let session_attrs: HashMap<String, String> =
+            HashMap::from([("parent".to_owned(), parent_id.to_string())]);
+        let valid_session_request = ClientEventRequest {
+            body: ClientEventRequestBody {
+                id: uuid_now,
+                event_type: ClientEventRequestType::Session,
+                attrs: Some(session_attrs),
+            },
+            headers: ClientEventRequestHeaders {
+                api_key: API_KEY.to_owned(),
+                site: SITE.to_owned(),
+            },
+        };
+        let session_ingest_event: IngestEvent = (&valid_session_request).try_into().unwrap();
+        match session_ingest_event {
+            IngestEvent::Session(ref session_event) => {
+                assert_eq!(session_event.api_key().value(), API_KEY);
+                assert_eq!(session_event.site().value(), SITE);
+                assert_eq!(session_event.id(), uuid_now);
+                assert_eq!(session_event.parent(), parent_id);
+            }
+            _ => panic!("Expected valid session event to be generated"),
+        }
+
+        // Section
+        let section_attrs: HashMap<String, String> =
+            HashMap::from([("parent".to_owned(), parent_id.to_string())]);
+        let valid_section_request = ClientEventRequest {
+            body: ClientEventRequestBody {
+                id: uuid_now,
+                event_type: ClientEventRequestType::Section,
+                attrs: Some(section_attrs),
+            },
+            headers: ClientEventRequestHeaders {
+                api_key: API_KEY.to_owned(),
+                site: SITE.to_owned(),
+            },
+        };
+        let section_ingest_event: IngestEvent = (&valid_section_request).try_into().unwrap();
+        match section_ingest_event {
+            IngestEvent::Section(ref section_event) => {
+                assert_eq!(section_event.api_key().value(), API_KEY);
+                assert_eq!(section_event.site().value(), SITE);
+                assert_eq!(section_event.id(), uuid_now);
+                assert_eq!(section_event.parent(), parent_id);
+            }
+            _ => panic!("Expected valid section event to be generated"),
+        }
+
+        // Click
+        let click_attrs: HashMap<String, String> =
+            HashMap::from([("parent".to_owned(), parent_id.to_string())]);
+        let valid_click_request = ClientEventRequest {
+            body: ClientEventRequestBody {
+                id: uuid_now,
+                event_type: ClientEventRequestType::Click,
+                attrs: Some(click_attrs),
+            },
+            headers: ClientEventRequestHeaders {
+                api_key: API_KEY.to_owned(),
+                site: SITE.to_owned(),
+            },
+        };
+        let click_ingest_event: IngestEvent = (&valid_click_request).try_into().unwrap();
+        match click_ingest_event {
+            IngestEvent::Click(ref click_event) => {
+                assert_eq!(click_event.api_key().value(), API_KEY);
+                assert_eq!(click_event.site().value(), SITE);
+                assert_eq!(click_event.id(), uuid_now);
+                assert_eq!(click_event.parent(), parent_id);
+            }
+            _ => panic!("Expected valid section event to be generated"),
+        }
+    }
+}

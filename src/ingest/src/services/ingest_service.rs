@@ -1,3 +1,5 @@
+use tracing::instrument;
+
 use crate::domain::{
     model::ingest_action_summary::IngestActionSummary,
     repository::ingest_event_repository::IngestEventRepository,
@@ -7,7 +9,7 @@ use crate::domain::{
 /// `IngestService<T>` is a generic implementation of the `IngestEventService`
 /// that can use any corresponding `IngestEventRepository` to carry out save
 /// actions on `IngestEvent` structs
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct IngestService<T>
 where
     T: IngestEventRepository,
@@ -29,11 +31,12 @@ where
 
 impl<T> IngestEventService for IngestService<T>
 where
-    T: IngestEventRepository,
+    T: IngestEventRepository + std::fmt::Debug,
 {
     /// `IngestService` implementation of the `save` method that is used to
     /// persist a `Vec` of `<IngestEvent>` to the underlying
     /// `IngestEventRepository`
+    #[instrument]
     async fn save(
         &self,
         events: Vec<crate::domain::model::ingest_event::IngestEvent>,

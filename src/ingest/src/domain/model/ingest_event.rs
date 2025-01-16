@@ -9,6 +9,10 @@ use crate::domain::model::util::{is_ts_within_ingest_range, try_uuid_datetime};
 /// related issues.
 #[derive(Clone, Error, Debug, PartialEq, Eq)]
 pub enum IngestEventError {
+    #[error("api_key submitted was empty")]
+    ApiKey,
+    #[error("site submitted was empty")]
+    Site,
     #[error("Timestamp from UUID beyond acceptable range for new event")]
     TimestampOutOfRange,
     #[error("UUID version mismatch - must be UUIDv7")]
@@ -38,7 +42,7 @@ impl ApiKey {
     /// `ApiKey` constructor
     pub fn new(key: impl AsRef<str>) -> Self {
         Self {
-            api_key: key.as_ref().to_owned(),
+            api_key: key.as_ref().trim().to_owned(),
         }
     }
     /// Provide access to the api_key value
@@ -57,7 +61,7 @@ impl Site {
     /// `Site` constructor
     pub fn new(site: impl AsRef<str>) -> Self {
         Self {
-            site: site.as_ref().to_owned(),
+            site: site.as_ref().trim().to_owned(),
         }
     }
     /// provide access to the site value
@@ -362,6 +366,13 @@ impl IngestEventCore {
     /// `IngestEventCore` constructor. Enforces domain rules with regard to
     /// `id` UUID type as well as the allowed range of times for events.
     pub fn try_new(api_key: ApiKey, site: Site, id: Uuid) -> Result<Self, IngestEventError> {
+        if api_key.value().trim().is_empty() {
+            return Err(IngestEventError::ApiKey);
+        }
+        if site.value().trim().is_empty() {
+            return Err(IngestEventError::Site);
+        }
+
         let ts = try_uuid_datetime(id)?;
 
         if is_ts_within_ingest_range(&ts) {
@@ -386,6 +397,33 @@ mod tests {
     const UUID_V4_STR: &str = "4e2abe52-5e86-4023-9f8b-34eba8d2cc59";
     const API_KEY_STR: &str = "123_456_789";
     const SITE: &str = "test.com";
+
+    #[test]
+    fn test_core_event() {
+        let uuid_now = Uuid::now_v7();
+        let valid_core =
+            IngestEventCore::try_new(ApiKey::new(API_KEY_STR), Site::new(SITE), uuid_now);
+        if valid_core.is_err() {
+            panic!("Expected a valid IngestEventCore to be created");
+        }
+
+        let invalid_api_key_err =
+            IngestEventCore::try_new(ApiKey::new(" "), Site::new(SITE), uuid_now).unwrap_err();
+        assert_eq!(
+            invalid_api_key_err,
+            IngestEventError::ApiKey,
+            "Expected ApiKey error"
+        );
+
+        let invalid_site_err =
+            IngestEventCore::try_new(ApiKey::new(API_KEY_STR), Site::new(" "), uuid_now)
+                .unwrap_err();
+        assert_eq!(
+            invalid_site_err,
+            IngestEventError::Site,
+            "Expected Site error"
+        );
+    }
 
     #[test]
     fn test_try_new_events() {
