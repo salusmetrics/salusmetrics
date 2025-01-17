@@ -74,3 +74,56 @@ impl IngestEventRepository for ClickhouseIngestRepository {
         }))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use clickhouse::{test, Client};
+    use uuid::Uuid;
+
+    use super::*;
+    use crate::domain::model::ingest_event::{ApiKey, Site, VisitorEvent};
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_save() {
+        let mock = test::Mock::new();
+        let recording = mock.add(test::handlers::record());
+        let mock_client = Client::default().with_url(mock.url());
+        let test_repository = ClickhouseIngestRepository::new(mock_client);
+
+        let uuid_now = Uuid::now_v7();
+
+        // Valid test with single Visitor event
+        let valid_test_events: Vec<IngestEvent> = vec![IngestEvent::Visitor(
+            VisitorEvent::try_new(ApiKey::new("abc_123"), Site::new("test.com"), uuid_now).unwrap(),
+        )];
+        let valid_test_records: Vec<ClickhouseEventRecord> = valid_test_events
+            .iter()
+            .map(|ev| ev.try_into().unwrap())
+            .collect();
+        let Ok(IngestActionSummary::Save(save_summary)) =
+            test_repository.save(valid_test_events).await
+        else {
+            panic!("Expected action save summary to be returned");
+        };
+        assert_eq!(
+            save_summary.event_count, 1,
+            "Expected to have one record saved"
+        );
+        let recorded: Vec<ClickhouseEventRecord> = recording.collect().await;
+        assert_eq!(
+            valid_test_records, recorded,
+            "Expected mock save to match test records"
+        );
+
+        // Invalid test with empty Vec of events
+        let invalid_test_events: Vec<IngestEvent> = Vec::new();
+        let Err(error) = test_repository.save(invalid_test_events).await else {
+            panic!("Expected an error when attempting to save empty vec");
+        };
+        assert_eq!(
+            error,
+            IngestRepositoryError::InvalidRequest,
+            "Expected error to be of type InvalidRequest for save of empty vec"
+        );
+    }
+}

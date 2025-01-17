@@ -46,7 +46,7 @@ impl From<&IngestEvent> for ClickhouseEventRecordType {
 /// because all events persisted to ClickHouse start off as records in a
 /// the `EVENT` table and thus have to store all non-common attributes in
 /// a (String, String) tuple.
-#[derive(Debug, Row, Deserialize, Serialize, Clone)]
+#[derive(Debug, Row, Deserialize, Serialize, Clone, PartialEq, Eq)]
 pub struct ClickhouseEventRecord {
     api_key: String,
     site: String,
