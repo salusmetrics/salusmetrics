@@ -12,6 +12,9 @@ pub enum IngestRepositoryError {
     /// limitations of the underlying repository record type.
     #[error("Error translating IngestEvent into valid repository record")]
     Conversion,
+    /// The request was invalid, due to empty list of events or other cause
+    #[error("Invalid request")]
+    InvalidRequest,
     /// The underlying specific implementation of the repository returned
     /// an error
     #[error("Error persisting IngestEvent")]

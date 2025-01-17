@@ -41,6 +41,9 @@ impl IngestEventRepository for ClickhouseIngestRepository {
         &self,
         events: Vec<IngestEvent>,
     ) -> Result<IngestActionSummary, IngestRepositoryError> {
+        if events.is_empty() {
+            return Err(IngestRepositoryError::InvalidRequest);
+        }
         let mut records: Vec<ClickhouseEventRecord> = Vec::with_capacity(events.len());
         for event in events.iter() {
             records.push(ClickhouseEventRecord::try_from(event)?);
