@@ -11,10 +11,14 @@ use crate::domain::{
 /// `IngestEventService` action.
 #[derive(Clone, Error, Debug, PartialEq, Eq)]
 pub enum IngestServiceError {
-    /// `Save` allows underlying `IngestRepositoryError` errors to be
+    /// `InvalidRequest` represents a request that didn't match rules
+    /// like saving an empty `Vec` of `IngestEvent`
+    #[error("Invalid request")]
+    InvalidRequest,
+    /// `Repository` allows underlying `IngestRepositoryError` errors to be
     /// handled at the service level
-    #[error("Error saving IngestEvent")]
-    Save(#[from] IngestRepositoryError),
+    #[error("Error handling IngestEvent")]
+    Repository(#[from] IngestRepositoryError),
 }
 
 /// `IngestEventService` trait provides the service interface for
