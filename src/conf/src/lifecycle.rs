@@ -1,7 +1,8 @@
 use tokio::signal;
 use tracing::instrument;
 
-/// Common function to handle graceful shutdown of the service
+/// `terminate_signal` is the common function to handle graceful shutdown of
+/// an application
 #[instrument]
 pub async fn terminate_signal() {
     let ctrl_c = async {
