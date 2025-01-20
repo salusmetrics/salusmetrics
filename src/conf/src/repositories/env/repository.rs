@@ -1,5 +1,6 @@
 use config::{Config, Environment};
 use serde::{Deserialize, Serialize};
+use tracing::instrument;
 
 use crate::domain::repository::configuration_repository::{
     ConfigurationRepository, ConfigurationRepositoryError,
@@ -59,6 +60,7 @@ impl EnvRepository {
 }
 
 impl ConfigurationRepository for EnvRepository {
+    #[instrument]
     fn try_compression_settings(
         &self,
     ) -> Result<CompressionSettings, ConfigurationRepositoryError> {
@@ -73,6 +75,7 @@ impl ConfigurationRepository for EnvRepository {
         Ok(settings.into())
     }
 
+    #[instrument]
     fn try_cors_settings(&self) -> Result<CorsSettings, ConfigurationRepositoryError> {
         let Some(ref layer_settings) = self.layer else {
             tracing::error!("Missing CORS configuration in ENV");
@@ -85,6 +88,7 @@ impl ConfigurationRepository for EnvRepository {
         Ok(cors_settings.into())
     }
 
+    #[instrument]
     fn try_listener_settings(&self) -> Result<ListenerSettings, ConfigurationRepositoryError> {
         let Some(ref listener_settings) = self.listener else {
             tracing::error!("Missing listener configuration in ENV");
@@ -93,6 +97,7 @@ impl ConfigurationRepository for EnvRepository {
         Ok(listener_settings.into())
     }
 
+    #[instrument]
     fn try_metrics_db_settings(
         &self,
     ) -> Result<MetricsDatabaseSettings, ConfigurationRepositoryError> {
@@ -103,6 +108,7 @@ impl ConfigurationRepository for EnvRepository {
         Ok(metrics_db_settings.into())
     }
 
+    #[instrument]
     fn try_timeout_settings(&self) -> Result<TimeoutSettings, ConfigurationRepositoryError> {
         let Some(ref layer_settings) = self.layer else {
             tracing::info!("Using default timeout settings for HTTP Layers");
@@ -115,6 +121,7 @@ impl ConfigurationRepository for EnvRepository {
         Ok(settings.into())
     }
 
+    #[instrument]
     fn try_tracing_settings(&self) -> Result<TracingSettings, ConfigurationRepositoryError> {
         let Some(ref settings) = self.tracing else {
             tracing::info!("Using default tracing subscriber settings");

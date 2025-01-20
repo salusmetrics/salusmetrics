@@ -1,3 +1,5 @@
+use tracing::instrument;
+
 use crate::domain::{
     model::configuration_error::ConfigurationError,
     repository::configuration_repository::{ConfigurationRepository, ConfigurationRepositoryError},
@@ -19,6 +21,7 @@ impl<T> ConfigurationService for ConfService<T>
 where
     T: ConfigurationRepository + std::fmt::Debug,
 {
+    #[instrument]
     fn try_compression_layer(
         &self,
     ) -> Result<tower_http::compression::CompressionLayer, ConfigurationServiceError> {
@@ -29,6 +32,7 @@ where
             .into())
     }
 
+    #[instrument]
     fn try_cors_layer(&self) -> Result<tower_http::cors::CorsLayer, ConfigurationServiceError> {
         (&self
             .conf_repository
@@ -38,6 +42,7 @@ where
             .map_err(map_configuration_err_to_service_err)
     }
 
+    #[instrument]
     fn try_listener_socket_addr(&self) -> Result<std::net::SocketAddr, ConfigurationServiceError> {
         (&self
             .conf_repository
@@ -47,6 +52,7 @@ where
             .map_err(map_configuration_err_to_service_err)
     }
 
+    #[instrument]
     fn try_metrics_db_client(&self) -> Result<clickhouse::Client, ConfigurationServiceError> {
         Ok((&self
             .conf_repository
@@ -55,6 +61,7 @@ where
             .into())
     }
 
+    #[instrument]
     fn try_timeout_layer(
         &self,
     ) -> Result<tower_http::timeout::TimeoutLayer, ConfigurationServiceError> {
@@ -65,6 +72,7 @@ where
             .into())
     }
 
+    #[instrument]
     fn try_tracing_subscriber_setup(&self) -> Result<(), ConfigurationServiceError> {
         self.conf_repository
             .try_tracing_settings()
@@ -102,6 +110,7 @@ where
     T: ConfigurationRepository + std::fmt::Debug,
 {
     /// Simple constructor for  `ConfService`
+    #[instrument]
     pub fn new(conf_repo: T) -> Self {
         Self {
             conf_repository: conf_repo,
