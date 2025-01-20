@@ -2,7 +2,7 @@ use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use conf::domain::service::configuration_service::ConfigurationService;
-use conf::{repositories::env::repository::EnvRepository, services::conf_service::ConfService};
+use conf::env_conf::env_conf;
 use http::Method;
 use hyper::StatusCode;
 use ingest::http_api::handlers::save_client_events::save_client_events;
@@ -23,7 +23,7 @@ pub const APP_NAME: &str = "SALUS_INGEST";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + 'static>> {
-    let conf_service = ConfService::new(EnvRepository::try_new(APP_NAME)?);
+    let conf_service = env_conf(APP_NAME)?;
 
     conf_service.try_tracing_subscriber_setup()?;
 
