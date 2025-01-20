@@ -18,7 +18,7 @@ use super::clickhouse_event_record::ClickhouseEventRecord;
 /// that then derive aggregate data for reporting.
 #[derive(Clone)]
 pub struct ClickhouseIngestRepository {
-    metrics_db_client: Client,
+    pub(crate) metrics_db_client: Client,
 }
 
 impl std::fmt::Debug for ClickhouseIngestRepository {

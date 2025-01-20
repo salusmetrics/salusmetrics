@@ -16,6 +16,10 @@ pub enum ConfigurationServiceError {
     /// not contain any settings for this particular config type
     #[error("Could not find configuration information for the requested type")]
     Missing,
+    /// `Repository` arises when the undrlying repo experiences an unspecified
+    /// error
+    #[error("Error utilizing repository to fetch configuration")]
+    Repository,
 }
 
 /// `ConfigurationService` trait provides the interface for fetching settings

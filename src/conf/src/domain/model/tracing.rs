@@ -1,5 +1,6 @@
-use crate::conf_error::ConfError;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
+use super::configuration_error::ConfigurationError;
 
 /// `TracingSettings` represents the application-wide settings that will be used
 /// to set up a `tracing_subscriber::EnvFilter`. The `directive` is intended to
@@ -18,9 +19,9 @@ impl Default for TracingSettings {
 }
 
 impl TryInto<EnvFilter> for &TracingSettings {
-    type Error = ConfError;
+    type Error = ConfigurationError;
     fn try_into(self) -> Result<EnvFilter, Self::Error> {
-        EnvFilter::try_new(&self.directive).map_err(|_| ConfError::Tracing)
+        EnvFilter::try_new(&self.directive).map_err(|_| ConfigurationError::Parse)
     }
 }
 
@@ -33,7 +34,7 @@ impl TracingSettings {
     }
 
     /// Attempt to initialize the tracing subscriber based on settings
-    pub fn try_init_tracing_subscriber(&self) -> Result<(), ConfError> {
+    pub fn try_init_tracing_subscriber(&self) -> Result<(), ConfigurationError> {
         let filter_layer: EnvFilter = self.try_into()?;
         tracing_subscriber::registry()
             .with(filter_layer)

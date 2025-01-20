@@ -1,9 +1,8 @@
 use axum::response::IntoResponse;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use clickhouse::Client;
-use conf::conf_error::ConfError;
-use conf::settings::CommonSettings;
+use conf::domain::service::configuration_service::ConfigurationService;
+use conf::{repositories::env::repository::EnvRepository, services::conf_service::ConfService};
 use http::Method;
 use hyper::StatusCode;
 use ingest::http_api::handlers::save_client_events::save_client_events;
@@ -24,21 +23,23 @@ pub const APP_NAME: &str = "SALUS_INGEST";
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + 'static>> {
-    let env_settings = CommonSettings::try_new_from_env(APP_NAME)?;
-    env_settings.tracing().try_init_tracing_subscriber()?;
+    let conf_service = ConfService::new(EnvRepository::try_new(APP_NAME)?);
 
-    let layer_settings = env_settings.layer().ok_or(ConfError::Layer)?;
-    let cors_layer = layer_settings
-        .try_create_cors_layer()?
-        .ok_or(ConfError::Cors)?
+    conf_service.try_tracing_subscriber_setup()?;
+
+    let metrics_client = conf_service.try_metrics_db_client()?;
+
+    let compression_layer = conf_service.try_compression_layer()?;
+    let cors_layer = conf_service
+        .try_cors_layer()?
         .allow_methods([Method::POST])
         .allow_headers(Any);
+    let timeout_layer = conf_service.try_timeout_layer()?;
 
-    let metrics_client: Client = (&env_settings.metricsdb().ok_or(ConfError::MetricsDb)?).into();
     let ingest_repository = ClickhouseIngestRepository::new(metrics_client);
     let ingest_service = IngestService::new(ingest_repository);
     let state = IngestApplicationState::new(ingest_service);
-    let mut app = Router::new()
+    let app = Router::new()
         .route("/explore", get(explore))
         // .route("/ingest", post(test_ingest))
         .route(
@@ -46,19 +47,13 @@ async fn main() -> Result<(), Box<dyn Error + 'static>> {
             post(save_client_events::<IngestService<ClickhouseIngestRepository>>),
         )
         .layer(TraceLayer::new_for_http())
+        .layer(compression_layer)
         .layer(cors_layer)
-        .layer(layer_settings.create_timeout_layer())
+        .layer(timeout_layer)
         .with_state(state);
 
-    if let Some(compression_layer) = layer_settings.try_create_compression_layer() {
-        app = app.layer(compression_layer);
-    }
-
-    let listener = env_settings
-        .listener()
-        .ok_or(ConfError::Listener)?
-        .try_new_listener()
-        .await?;
+    let listener_socket_addr = conf_service.try_listener_socket_addr()?;
+    let listener = tokio::net::TcpListener::bind(listener_socket_addr).await?;
     tracing::debug!("listening on {}", listener.local_addr().unwrap());
 
     axum::serve(listener, app)
