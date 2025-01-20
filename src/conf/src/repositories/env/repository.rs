@@ -132,7 +132,7 @@ impl ConfigurationRepository for EnvRepository {
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+mod tests {
     use std::env::{remove_var, set_var};
     use uuid::Uuid;
 

@@ -117,3 +117,119 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::net::Ipv4Addr;
+
+    use super::*;
+    use crate::domain::model::compression::CompressionSettings;
+    use crate::domain::model::cors::CorsSettings;
+    use crate::domain::model::listener::ListenerSettings;
+    use crate::domain::model::metrics_db::MetricsDatabaseSettings;
+    use crate::domain::model::timeout::TimeoutSettings;
+    use crate::domain::model::tracing::TracingSettings;
+    use crate::domain::repository::configuration_repository::tests::MockConfigurationRepository;
+    use crate::domain::service::configuration_service::ConfigurationService;
+
+    #[test]
+    fn test_conf_service() {
+        // Positive test cases
+        let mut test_success_repo = MockConfigurationRepository::default();
+
+        test_success_repo.set_compression_result(Ok(CompressionSettings::default()));
+        test_success_repo.set_cors_result(Ok(CorsSettings {
+            max_age_secs: Some(20),
+            origins: vec!["test.com".to_owned()],
+        }));
+        test_success_repo.set_listener_result(Ok(ListenerSettings {
+            port: 8444,
+            ipv4: Some(Ipv4Addr::LOCALHOST),
+            ipv6: None,
+        }));
+        test_success_repo.set_metrics_db(Ok(MetricsDatabaseSettings::new(
+            "http://localhost:3344",
+            "METRICS_DB",
+            "user",
+            "pass",
+        )));
+        test_success_repo.set_timeout_result(Ok(TimeoutSettings { millis: 5599 }));
+        test_success_repo.set_tracing_result(Ok(TracingSettings {
+            directive: "trace".to_owned(),
+        }));
+
+        let test_success_service = ConfService::new(test_success_repo);
+        assert!(
+            test_success_service.try_compression_layer().is_ok(),
+            "Expected to create valid compression layer"
+        );
+
+        assert!(
+            test_success_service.try_cors_layer().is_ok(),
+            "Expected to create valid CORS layer"
+        );
+
+        assert!(
+            test_success_service.try_listener_socket_addr().is_ok(),
+            "Expected to create valid listener soccet address"
+        );
+
+        assert!(
+            test_success_service.try_metrics_db_client().is_ok(),
+            "Expected to create valid metrics db client"
+        );
+
+        assert!(
+            test_success_service.try_timeout_layer().is_ok(),
+            "Expected to create valid timeout layer"
+        );
+
+        // The following test is commented out because multiple calls to
+        // set up a tracing subscriber will cause a panic.
+        //       assert!(
+        //           test_service.try_tracing_subscriber_setup().is_ok(),
+        //           "Expected to create valid compression layer"
+        //       );
+
+        // Negative test cases
+        let mut test_failure_repo = MockConfigurationRepository::default();
+
+        test_failure_repo.set_compression_result(Err(ConfigurationRepositoryError::Repository));
+        test_failure_repo.set_cors_result(Err(ConfigurationRepositoryError::Missing));
+        test_failure_repo.set_listener_result(Err(ConfigurationRepositoryError::Missing));
+        test_failure_repo.set_metrics_db(Err(ConfigurationRepositoryError::Missing));
+        test_failure_repo.set_timeout_result(Err(ConfigurationRepositoryError::Repository));
+        test_failure_repo.set_tracing_result(Err(ConfigurationRepositoryError::Repository));
+
+        let test_failure_service = ConfService::new(test_failure_repo);
+        assert!(
+            test_failure_service.try_compression_layer().is_err(),
+            "Expected error for compression layer"
+        );
+
+        assert!(
+            test_failure_service.try_cors_layer().is_err(),
+            "Expected error for CORS layer"
+        );
+
+        assert!(
+            test_failure_service.try_listener_socket_addr().is_err(),
+            "Expected error for listener soccet address"
+        );
+
+        assert!(
+            test_failure_service.try_metrics_db_client().is_err(),
+            "Expected error for metrics db client"
+        );
+
+        assert!(
+            test_failure_service.try_timeout_layer().is_err(),
+            "Expected error for timeout layer"
+        );
+
+        assert!(
+            test_failure_service.try_tracing_subscriber_setup().is_err(),
+            "Expected error for tracing settings"
+        );
+    }
+}
