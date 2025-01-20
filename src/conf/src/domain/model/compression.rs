@@ -1,7 +1,9 @@
 use tower_http::compression::CompressionLayer;
 
 /// `CompressionSettings` allows the setup of `tower-http` `CompressionLayer`
-/// `gzip` and `deflate` are booleans that control those attributes respectively
+/// `gzip` and `deflate` are booleans that control those attributes
+/// respectively. The default setting for this configuration is to enable
+/// both gzip and deflate.
 #[derive(Debug, Clone)]
 pub struct CompressionSettings {
     pub gzip: Option<bool>,

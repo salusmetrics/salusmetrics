@@ -2,15 +2,27 @@ use clickhouse::Client;
 
 /// `MetricsDatabaseSettings` represents the required parameters for connecting
 /// to the Clickhouse database instance in which metrics data is being recorded
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MetricsDatabaseSettings {
-    pub url: String,
-    pub database: String,
-    pub user: String,
-    pub pass: String,
+    url: String,
+    database: String,
+    user: String,
+    pass: String,
+}
+
+impl std::fmt::Debug for MetricsDatabaseSettings {
+    /// `fmt` implemented for `Debug` to prevent leakage of username and
+    /// password for the database into logs or traces
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Point")
+            .field("url", &self.url)
+            .field("database", &self.database)
+            .finish()
+    }
 }
 
 impl MetricsDatabaseSettings {
+    /// `MetricsDatabaseSettings` simple constructor
     pub fn new(
         url: impl AsRef<str>,
         database: impl AsRef<str>,

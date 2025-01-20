@@ -70,7 +70,8 @@ impl From<&EnvListenerSettings> for ListenerSettings {
 }
 
 /// `EnvMetricsDatabaseSettings` represents the required parameters for connecting
-/// to the Clickhouse database instance in which metrics data is being recorded
+/// to the Clickhouse database instance in which metrics data is being recorded.
+/// All fields must be specified in order to derive a valid database connection
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EnvMetricsDatabaseSettings {
     url: String,
@@ -81,18 +82,14 @@ pub struct EnvMetricsDatabaseSettings {
 
 impl From<&EnvMetricsDatabaseSettings> for MetricsDatabaseSettings {
     fn from(value: &EnvMetricsDatabaseSettings) -> Self {
-        Self {
-            url: value.url.to_owned(),
-            database: value.database.to_owned(),
-            user: value.user.to_owned(),
-            pass: value.pass.to_owned(),
-        }
+        Self::new(&value.url, &value.database, &value.user, &value.pass)
     }
 }
 
 /// `TimeoutSettings` allows the customization of a given app's TimeoutLayer
 /// which determines how long the server will wait before responding with a
-/// timeout. If none is specified, then default value will be used
+/// timeout. If none is specified, then default value will be used. The value
+/// accepted is in milliseconds
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EnvTimeoutSettings {
     millis: u64,

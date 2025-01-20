@@ -74,6 +74,9 @@ where
     }
 }
 
+/// `map_configuration_err_to_service_err` is a simple function that is used to
+/// map between the domain model errors into the outermost service errors that
+/// are delivered to consumers of this service
 fn map_configuration_err_to_service_err(conf_err: ConfigurationError) -> ConfigurationServiceError {
     match conf_err {
         ConfigurationError::Invalid => ConfigurationServiceError::Invalid,
@@ -81,6 +84,9 @@ fn map_configuration_err_to_service_err(conf_err: ConfigurationError) -> Configu
     }
 }
 
+/// `map_repo_err_to_service_err` is a simple function that is used to map
+/// between errors that arise at the repository level into errors that can be
+/// delivered to consumers of the service layer.
 fn map_repo_err_to_service_err(
     repo_err: ConfigurationRepositoryError,
 ) -> ConfigurationServiceError {
@@ -95,6 +101,7 @@ impl<T> ConfService<T>
 where
     T: ConfigurationRepository + std::fmt::Debug,
 {
+    /// Simple constructor for  `ConfService`
     pub fn new(conf_repo: T) -> Self {
         Self {
             conf_repository: conf_repo,

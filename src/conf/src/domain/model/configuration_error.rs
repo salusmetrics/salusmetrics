@@ -1,7 +1,9 @@
 use thiserror::Error;
 
 /// `ConfigurationError` represents the domain errors that can arise
-/// when a configuration model is applying domain rules
+/// when a configuration model is applying domain rules. This includes the
+/// possibility of converting from the domain structs into a desired end
+/// form
 #[derive(Clone, Error, Debug, PartialEq, Eq)]
 pub enum ConfigurationError {
     /// `Invalid` arises when the configuration specified for the

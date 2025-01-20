@@ -5,12 +5,14 @@ use super::configuration_error::ConfigurationError;
 /// `TracingSettings` represents the application-wide settings that will be used
 /// to set up a `tracing_subscriber::EnvFilter`. The `directive` is intended to
 /// be passed along to `EnvFilter::try_new`.
+/// Default settings for tracing subscriber are to filter only ERROR and above
 #[derive(Debug, Clone)]
 pub struct TracingSettings {
     pub directive: String,
 }
 
 impl Default for TracingSettings {
+    /// Defaults to filtering all tracing to ERROR and above
     fn default() -> Self {
         TracingSettings {
             directive: "ERROR".to_owned(),

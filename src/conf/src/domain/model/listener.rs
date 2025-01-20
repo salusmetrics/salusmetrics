@@ -4,8 +4,11 @@ use tracing::instrument;
 use super::configuration_error::ConfigurationError;
 
 /// `ListenerSettings` are used to determine the HTTP listener characteristics
-/// of a given metrics application. These include IPv4 or IPv6 address
-/// (exclusive) should be attached to as well as the port.
+/// of a given metrics application. These include the IPv4 or IPv6 address
+/// (exclusive) that should be attached to as well as the port. Port value
+/// is always required. If no IPv4 or IPv6 address has been specified then
+/// the configuration will fall back to a default of `Ipv4Addr::UNSPECIFIED`
+/// which corresponds to `0.0.0.0`
 #[derive(Debug, Clone)]
 pub struct ListenerSettings {
     pub port: u16,
@@ -26,35 +29,6 @@ impl TryFrom<&ListenerSettings> for SocketAddr {
             (None, None) => Ok(SocketAddr::from((Ipv4Addr::UNSPECIFIED, value.port))),
             (Some(v4), None) => Ok(SocketAddr::from((v4, value.port))),
             (None, Some(v6)) => Ok(SocketAddr::from((v6, value.port))),
-        }
-    }
-}
-
-impl ListenerSettings {
-    /// Port only constructor for `ListenerSettings`
-    pub fn new_with_port(port: u16) -> Self {
-        Self {
-            port,
-            ipv4: None,
-            ipv6: None,
-        }
-    }
-
-    /// IPv4 constructor
-    pub fn new_ipv4(ipv4: Ipv4Addr, port: u16) -> Self {
-        Self {
-            port,
-            ipv4: Some(ipv4),
-            ipv6: None,
-        }
-    }
-
-    /// IPv6 constructor
-    pub fn new_ipv6(ipv6: Ipv6Addr, port: u16) -> Self {
-        Self {
-            port,
-            ipv4: None,
-            ipv6: Some(ipv6),
         }
     }
 }

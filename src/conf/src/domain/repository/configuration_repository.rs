@@ -24,6 +24,9 @@ pub enum ConfigurationRepositoryError {
     Repository,
 }
 
+/// `ConfigurationRepository` represents the logical operations that must be
+/// available for all structs that will provide access to the underlying
+/// configuration settings.
 pub trait ConfigurationRepository: 'static + Clone + Send + Sync {
     /// `try_compression_settings` attempts fetch `CompressionSettings`
     fn try_compression_settings(&self)

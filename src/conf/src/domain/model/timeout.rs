@@ -6,7 +6,8 @@ pub const DEFAULT_TIMEOUT_MILLIS: u64 = 30000;
 
 /// `TimeoutSettings` allows the customization of a given app's TimeoutLayer
 /// which determines how long the server will wait before responding with a
-/// timeout. If none is specified, then default value will be used
+/// timeout. If none is specified, then default value will be used.
+/// This will default to a setting of 30 seconds.
 #[derive(Debug, Clone)]
 pub struct TimeoutSettings {
     pub millis: u64,
@@ -20,6 +21,7 @@ impl TimeoutSettings {
 }
 
 impl Default for TimeoutSettings {
+    /// Default to a timeout of 30 seconds
     fn default() -> Self {
         Self {
             millis: DEFAULT_TIMEOUT_MILLIS,
