@@ -1,6 +1,6 @@
 use crate::{
     domain::service::configuration_service::ConfigurationServiceError,
-    repositories::env::repository::EnvRepository, services::conf_service::ConfService,
+    repositories::env::env_repository::EnvRepository, services::conf_service::ConfService,
 };
 
 /// Convenience function to get a `ConfService<EnvRepository>` for a given
