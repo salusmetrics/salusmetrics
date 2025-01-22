@@ -49,7 +49,7 @@ where
             .allow_headers(Any);
         let timeout_layer = self.conf_service.try_timeout_layer()?;
 
-        let ingest_repository = ClickhouseIngestRepository::new(metrics_client);
+        let ingest_repository = ClickhouseIngestRepository::try_new(metrics_client).await?;
         let ingest_service = IngestService::new(ingest_repository);
         let state = IngestApplicationState::new(ingest_service);
         let app = Router::new()

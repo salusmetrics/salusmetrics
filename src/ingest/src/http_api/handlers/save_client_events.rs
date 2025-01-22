@@ -45,12 +45,17 @@ pub async fn save_client_events<I: IngestEventService + std::fmt::Debug>(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::*;
     use uuid::Uuid;
 
     use crate::{
         domain::{
-            model::ingest_action_summary::{IngestActionSummary, IngestEventSaveSummary},
+            model::{
+                ingest_action_summary::{IngestActionSummary, IngestEventSaveSummary},
+                ingest_event::{ApiKey, IngestEventSource, Site},
+            },
             repository::ingest_event_repository::test::MockIngestEventRepository,
         },
         http_api::model::client_event_request::ClientEventRequestType,
@@ -66,6 +71,10 @@ mod tests {
             save_result: Ok(IngestActionSummary::Save(IngestEventSaveSummary {
                 event_count: 1,
             })),
+            event_source_result: Ok(HashSet::from([IngestEventSource::new(
+                ApiKey::new("abc-123"),
+                Site::new("test.com"),
+            )])),
         };
         let test_success_service = IngestService {
             ingest_event_repository: mock_success_repo,

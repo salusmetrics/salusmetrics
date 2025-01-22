@@ -2,7 +2,7 @@ use tracing::instrument;
 
 use crate::domain::{
     model::ingest_action_summary::IngestActionSummary,
-    repository::ingest_event_repository::IngestEventRepository,
+    repository::ingest_event_repository::{IngestEventRepository, IngestRepositoryError},
     service::ingest_event_service::{IngestEventService, IngestServiceError},
 };
 
@@ -47,18 +47,24 @@ where
         self.ingest_event_repository
             .save(events)
             .await
-            .map_err(|e| e.into())
+            .map_err(|e| match e {
+                IngestRepositoryError::InvalidRequest => IngestServiceError::InvalidRequest,
+                IngestRepositoryError::Conversion => e.into(),
+                IngestRepositoryError::Repository => e.into(),
+            })
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use uuid::Uuid;
 
     use crate::domain::{
         model::{
             ingest_action_summary::{IngestActionSummary, IngestEventSaveSummary},
-            ingest_event::{ApiKey, IngestEvent, Site, VisitorEvent},
+            ingest_event::{ApiKey, IngestEvent, IngestEventSource, Site, VisitorEvent},
         },
         repository::ingest_event_repository::{
             test::MockIngestEventRepository, IngestRepositoryError,
@@ -77,6 +83,10 @@ mod tests {
             save_result: Ok(IngestActionSummary::Save(IngestEventSaveSummary {
                 event_count: 1,
             })),
+            event_source_result: Ok(HashSet::from([IngestEventSource::new(
+                ApiKey::new("abc-123"),
+                Site::new("test.com"),
+            )])),
         };
         let test_success_service = IngestService {
             ingest_event_repository: mock_success_repo,
@@ -108,6 +118,7 @@ mod tests {
         // Valid request with repository returning error
         let mock_err_repo = MockIngestEventRepository {
             save_result: Err(IngestRepositoryError::Repository),
+            event_source_result: Err(IngestRepositoryError::Repository),
         };
         let test_err_service = IngestService {
             ingest_event_repository: mock_err_repo,

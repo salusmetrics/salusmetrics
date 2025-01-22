@@ -33,7 +33,7 @@ pub enum IngestEvent {
 }
 
 /// `ApiKey` newtype wrapper for the api_key string
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct ApiKey {
     api_key: String,
 }
@@ -52,7 +52,7 @@ impl ApiKey {
 }
 
 /// `Site` newtype wrapper for the site an event is coming from
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct Site {
     site: String,
 }
@@ -67,6 +67,33 @@ impl Site {
     /// provide access to the site value
     pub fn value(&self) -> &String {
         &self.site
+    }
+}
+
+/// `IngestEventSource` represents the combination of the api_key and the
+/// site into a single entity that is used to check whether or not to continue
+/// processing a given event
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct IngestEventSource {
+    api_key: ApiKey,
+    site: Site,
+}
+
+impl<T> From<&T> for IngestEventSource
+where
+    T: CommonEvent,
+{
+    fn from(value: &T) -> Self {
+        Self {
+            api_key: value.api_key().to_owned(),
+            site: value.site().to_owned(),
+        }
+    }
+}
+
+impl IngestEventSource {
+    pub fn new(api_key: ApiKey, site: Site) -> Self {
+        Self { api_key, site }
     }
 }
 
