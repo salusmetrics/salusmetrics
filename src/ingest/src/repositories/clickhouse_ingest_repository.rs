@@ -122,7 +122,7 @@ async fn retrieve_event_sources(
         .fetch_all::<ClickhouseSourceRecord>()
         .await
         .map_err(|e| {
-            tracing::error!("Encountered error fetching event source records {e}");
+            tracing::error!("Encountered error fetching event source records {e}. This is likely due to connection problems with Clickhouse.");
             IngestRepositoryError::Repository
         })
 }
