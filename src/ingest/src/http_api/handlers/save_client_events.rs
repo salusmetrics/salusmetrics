@@ -76,9 +76,7 @@ mod tests {
                 Site::new("test.com"),
             )])),
         };
-        let test_success_service = IngestService {
-            ingest_event_repository: mock_success_repo,
-        };
+        let test_success_service = IngestService::new(mock_success_repo);
         let test_success_state = IngestApplicationState::new(test_success_service);
         let valid_request_bodies: Vec<ClientEventRequestBody> = vec![ClientEventRequestBody {
             attrs: None,

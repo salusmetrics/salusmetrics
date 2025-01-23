@@ -1,7 +1,9 @@
+use std::{collections::HashSet, sync::Arc};
+
 use tracing::instrument;
 
 use crate::domain::{
-    model::ingest_action_summary::IngestActionSummary,
+    model::{ingest_action_summary::IngestActionSummary, ingest_event::IngestEventSource},
     repository::ingest_event_repository::{IngestEventRepository, IngestRepositoryError},
     service::ingest_event_service::{IngestEventService, IngestServiceError},
 };
@@ -14,7 +16,7 @@ pub struct IngestService<T>
 where
     T: IngestEventRepository + std::fmt::Debug,
 {
-    pub ingest_event_repository: T,
+    ingest_event_repository: Arc<T>,
 }
 
 impl<T> IngestService<T>
@@ -24,7 +26,7 @@ where
     /// `IngestService<T>` constructor
     pub fn new(ingest_event_repository: T) -> Self {
         Self {
-            ingest_event_repository,
+            ingest_event_repository: Arc::new(ingest_event_repository),
         }
     }
 }
@@ -52,6 +54,16 @@ where
                 IngestRepositoryError::Conversion => e.into(),
                 IngestRepositoryError::Repository => e.into(),
             })
+    }
+
+    /// `IngestService` implementation of the `event_sources` method that
+    /// provides the combination of api_key/site combinations that this
+    /// server is configured to accept requests from
+    async fn event_sources(&self) -> Result<HashSet<IngestEventSource>, IngestServiceError> {
+        self.ingest_event_repository
+            .event_sources()
+            .await
+            .map_err(|e| e.into())
     }
 }
 
@@ -88,9 +100,7 @@ mod tests {
                 Site::new("test.com"),
             )])),
         };
-        let test_success_service = IngestService {
-            ingest_event_repository: mock_success_repo,
-        };
+        let test_success_service = IngestService::new(mock_success_repo);
         let test_events: Vec<IngestEvent> = vec![IngestEvent::Visitor(
             VisitorEvent::try_new(ApiKey::new("abc_123"), Site::new("test.com"), uuid_now).unwrap(),
         )];
@@ -102,6 +112,17 @@ mod tests {
         assert_eq!(
             save_success_result.event_count, 1,
             "Expected to have 1 result saved in mock"
+        );
+
+        // Test event_source
+        let expected_result = HashSet::from([IngestEventSource::new(
+            ApiKey::new("abc-123"),
+            Site::new("test.com"),
+        )]);
+        let event_sources_result = test_success_service.event_sources().await.unwrap();
+        assert_eq!(
+            event_sources_result, expected_result,
+            "Expected to get back identical event_source results"
         );
 
         // Invalid request with empty vec failure case
@@ -120,9 +141,7 @@ mod tests {
             save_result: Err(IngestRepositoryError::Repository),
             event_source_result: Err(IngestRepositoryError::Repository),
         };
-        let test_err_service = IngestService {
-            ingest_event_repository: mock_err_repo,
-        };
+        let test_err_service = IngestService::new(mock_err_repo);
         let test_events: Vec<IngestEvent> = vec![IngestEvent::Visitor(
             VisitorEvent::try_new(ApiKey::new("abc_123"), Site::new("test.com"), uuid_now).unwrap(),
         )];
