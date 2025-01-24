@@ -1,6 +1,7 @@
 use axum::response::IntoResponse;
 use http::StatusCode;
-use serde::{Deserialize, Serialize};
+use serde_repr::Deserialize_repr;
+use serde_repr::Serialize_repr;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -20,12 +21,13 @@ use super::client_event_request_components::ClientEventRequestHeaders;
 /// `ClientEventRequestType` represents the type of analytics event submitted by
 /// client. This enum must match up with the `event_record`'s
 /// `EventRecordType` enum.
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
 pub enum ClientEventRequestType {
-    Visitor,
-    Session,
-    Section,
-    Click,
+    Visitor = 1,
+    Session = 2,
+    Section = 3,
+    Click = 4,
 }
 
 /// `ClientEventRequestError` encapsulates the error types that can occur
@@ -82,6 +84,7 @@ impl IntoResponse for ClientEventRequestError {
 /// HTTP source. Crucially, data to build up this request comes from both the
 /// headers of the HTTP request as well as from the body of the request. Each
 /// event in a full HTTP request is individually constructed.
+#[derive(Debug)]
 pub struct ClientEventRequest {
     pub headers: ClientEventRequestHeaders,
     pub body: ClientEventRequestBody,
@@ -216,6 +219,36 @@ mod tests {
 
     pub const API_KEY: &str = "abc_123";
     pub const SITE: &str = "test.com";
+
+    /// This is very important in order to keep the mapping in TypeScript in
+    /// line with this library
+    #[test]
+    fn test_event_request_type_discriminant() {
+        let visitor_discriminant = ClientEventRequestType::Visitor as u32;
+        assert_eq!(
+            visitor_discriminant, 1,
+            "ClientEventRequestType::Visitor discriminant does not match expected value"
+        );
+
+        let session_discriminant = ClientEventRequestType::Session as u32;
+        assert_eq!(
+            session_discriminant, 2,
+            "ClientEventRequestType::Session discriminant does not match expected value"
+        );
+
+        let section_discriminant = ClientEventRequestType::Section as u32;
+        assert_eq!(
+            section_discriminant, 3,
+            "ClientEventRequestType::Section discriminant does not match expected value"
+        );
+
+        let click_discriminant = ClientEventRequestType::Click as u32;
+        assert_eq!(
+            click_discriminant, 4,
+            "ClientEventRequestType::Click discriminant does not match expected value"
+        );
+    }
+
     #[test]
     fn test_try_from_client_request() {
         let uuid_now = Uuid::now_v7();

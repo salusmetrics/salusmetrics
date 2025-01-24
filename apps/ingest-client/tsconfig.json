@@ -1,0 +1,15 @@
+{
+  "extends": "@tsconfig/strictest/tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist/",
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "module": "es6",
+    "sourceMap": true,
+    "target": "ES6",
+    "lib": ["ES2023", "WebWorker"],
+    "allowJs": true,
+    "moduleResolution": "bundler",
+    "noEmitOnError": true
+  }
+}

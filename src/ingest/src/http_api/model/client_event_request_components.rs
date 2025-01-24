@@ -35,9 +35,12 @@ pub const API_KEY_HTTP_HEADER: &str = "api-key";
 /// in attrs by the client, but other data will be added by the server side.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ClientEventRequestBody {
+    #[serde(alias = "t")]
     pub event_type: ClientEventRequestType,
+    #[serde(alias = "i")]
     #[serde(with = "clickhouse::serde::uuid")]
     pub id: Uuid,
+    #[serde(alias = "a")]
     pub attrs: Option<HashMap<String, String>>,
 }
 

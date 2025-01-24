@@ -108,7 +108,7 @@ impl TryFrom<&SectionEvent> for ClickhouseEventRecord {
     fn try_from(event: &SectionEvent) -> Result<Self, Self::Error> {
         let builder = ClickhouseEventRecordBuilder::from(&event);
         builder
-            .event_type(ClickhouseEventRecordType::Session)
+            .event_type(ClickhouseEventRecordType::Section)
             .parent(event.parent())
             .try_build()
     }
