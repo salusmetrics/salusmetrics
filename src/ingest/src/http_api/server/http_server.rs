@@ -1,23 +1,13 @@
-use axum::{
-    response::IntoResponse,
-    routing::{get, post},
-    Json, Router,
-};
+use axum::{routing::post, Router};
 use conf::domain::service::configuration_service::ConfigurationService;
-use http::{Method, StatusCode};
-use std::{collections::HashMap, error::Error};
+use http::Method;
+use std::error::Error;
 use tower_http::{cors::Any, trace::TraceLayer};
-use tracing::instrument;
-use uuid::Uuid;
 
 use crate::{
     http_api::{
         handlers::save_client_events::save_client_events,
-        model::{
-            client_event_request::ClientEventRequestType,
-            client_event_request_components::ClientEventRequestBody,
-            ingest_application_state::IngestApplicationState,
-        },
+        model::ingest_application_state::IngestApplicationState,
     },
     repositories::clickhouse_ingest_repository::ClickhouseIngestRepository,
     services::ingest_service::IngestService,
@@ -57,7 +47,6 @@ where
                 "/multi",
                 post(save_client_events::<IngestService<ClickhouseIngestRepository>>),
             )
-            .route("/explore", get(explore))
             .layer(TraceLayer::new_for_http())
             .layer(compression_layer)
             .layer(cors_layer)
@@ -74,36 +63,4 @@ where
             .unwrap();
         Ok(())
     }
-}
-
-// TODO: remove this test function
-
-#[instrument]
-async fn explore() -> impl IntoResponse {
-    let visitor_uuid = Uuid::now_v7();
-    let session_uuid = Uuid::now_v7();
-    let section_uuid = Uuid::now_v7();
-    let mut session_attrs: HashMap<String, String> = HashMap::new();
-    session_attrs.insert("parent".to_owned(), visitor_uuid.to_string());
-    let mut section_attrs: HashMap<String, String> = HashMap::new();
-    section_attrs.insert("parent".to_owned(), session_uuid.to_string());
-    let visitor_event = ClientEventRequestBody::new(
-        ClientEventRequestType::Visitor,
-        visitor_uuid.to_owned(),
-        None,
-    );
-    let session_event = ClientEventRequestBody::new(
-        ClientEventRequestType::Session,
-        session_uuid.to_owned(),
-        Some(session_attrs),
-    );
-    let section_event = ClientEventRequestBody::new(
-        ClientEventRequestType::Section,
-        section_uuid.to_owned(),
-        Some(section_attrs),
-    );
-
-    let all_events: Vec<ClientEventRequestBody> = vec![visitor_event, session_event, section_event];
-
-    (StatusCode::OK, Json(all_events))
 }
