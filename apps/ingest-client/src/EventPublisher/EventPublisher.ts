@@ -1,4 +1,4 @@
-import { ToClientEvent } from "./ClientEvent";
+import { ToPublishEvent } from "./PublishEvent";
 
 export interface EventPublishSuccess {
   count: number;
@@ -13,5 +13,5 @@ export enum EventPublishError {
 export type EventPublishResult = EventPublishSuccess | EventPublishError;
 
 export interface EventPublisher {
-  publish(events: ToClientEvent[]): Promise<EventPublishResult>;
+  publish(events: ToPublishEvent[]): Promise<EventPublishResult>;
 }

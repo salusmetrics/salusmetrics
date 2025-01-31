@@ -1,5 +1,9 @@
-import { ToClientEvent } from "./ClientEvent";
-import { EventPublisher, EventPublishError, EventPublishResult } from "./EventPublisher";
+import { ToPublishEvent } from "./PublishEvent";
+import {
+  EventPublisher,
+  EventPublishError,
+  EventPublishResult,
+} from "./EventPublisher";
 
 export class HttpEventPublisher implements EventPublisher {
   private api_key: string;
@@ -7,34 +11,36 @@ export class HttpEventPublisher implements EventPublisher {
 
   constructor(api_key: string, host: string) {
     this.api_key = api_key;
-    this.endpoint = host + '/multi';
+    this.endpoint = host + "/multi";
   }
 
-  async publish(events: ToClientEvent[]): Promise<EventPublishResult> {
+  async publish(events: ToPublishEvent[]): Promise<EventPublishResult> {
     const response = await fetch(this.createRequest(events));
-    
+
     if (response.ok) {
       return { count: events.length };
     }
+
     if (response.status == 500) {
       return EventPublishError.InternalServerError;
     }
+
     if (response.status == 400) {
       return EventPublishError.BadRequest;
     }
+
     return EventPublishError.Timeout;
   }
 
-  private createRequest(events: ToClientEvent[]): Request {
+  private createRequest(events: ToPublishEvent[]): Request {
     return new Request(this.endpoint, {
-      method: 'POST',
-      mode: 'cors',
+      method: "POST",
+      mode: "cors",
       headers: {
-        "content-type": 'application/json',
+        "content-type": "application/json",
         "api-key": this.api_key,
       },
-      body: JSON.stringify(events.map(e => e.toClientEvent())),
+      body: JSON.stringify(events.map((e) => e.toPublishEvent())),
     });
   }
-
 }

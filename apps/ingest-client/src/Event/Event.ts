@@ -1,13 +1,34 @@
-import { ClientEvent, EventType } from "./ClientEvent";
-import {v7 as uuidv7} from 'uuid';
+import { PublishEvent } from "../EventPublisher/PublishEvent";
+import {
+  v7 as uuidv7,
+  validate as uuidValidate,
+  version as uuidVersion,
+} from "uuid";
+
+export const enum EventType {
+  Visitor = 1,
+  Session = 2,
+  Section = 3,
+  Click = 4,
+}
 
 export interface EventReference {
   readonly event_type: EventType;
   readonly id: string;
 }
 
+export function isEventReference(value: any): value is EventReference {
+  return !(
+    typeof value == "undefined" ||
+    typeof value.event_type != "number" ||
+    typeof value.id != "string" ||
+    !uuidValidate(value.id) ||
+    uuidVersion(value.id) != 7
+  );
+}
+
 export interface Event extends EventReference {
-  toClientEvent(): ClientEvent;
+  toPublishEvent(): PublishEvent;
 }
 
 export interface VisitorEvent extends Event {
@@ -48,8 +69,8 @@ export class Visitor implements VisitorEvent, VisitorReference {
     this.event_type = EventType.Visitor;
     this.id = uuidv7();
   }
-  
-  toClientEvent(): ClientEvent {
+
+  toPublishEvent(): PublishEvent {
     return {
       t: this.event_type,
       i: this.id,
@@ -68,8 +89,8 @@ export class Session implements SessionEvent, SessionReference {
     this.id = uuidv7();
     this.parent = parent;
   }
-  
-  toClientEvent(): ClientEvent {
+
+  toPublishEvent(): PublishEvent {
     const attrs: Record<string, string> = { parent: this.parent.id };
     return {
       t: this.event_type,
@@ -89,8 +110,8 @@ export class Section implements SectionEvent, SectionReference {
     this.id = uuidv7();
     this.parent = parent;
   }
-  
-  toClientEvent(): ClientEvent {
+
+  toPublishEvent(): PublishEvent {
     const attrs: Record<string, string> = { parent: this.parent.id };
     return {
       t: this.event_type,
@@ -110,8 +131,8 @@ export class Click implements ClickEvent {
     this.id = uuidv7();
     this.parent = parent;
   }
-  
-  toClientEvent(): ClientEvent {
+
+  toPublishEvent(): PublishEvent {
     const attrs: Record<string, string> = { parent: this.parent.id };
     return {
       t: this.event_type,
