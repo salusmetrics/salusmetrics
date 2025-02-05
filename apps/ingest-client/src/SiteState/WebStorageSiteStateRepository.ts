@@ -28,22 +28,18 @@ export class WebStorageSiteStateRepository implements SiteStateRepository {
     this.section = undefined;
   }
 
-  clearSiteState(): void {
+  clearSiteState(): SiteStateRepositoryResult {
     this.clearSection();
     this.clearSession();
     this.clearVisitor();
+    return { visitor: undefined, session: undefined, section: undefined };
   }
 
   getSiteState(): SiteStateRepositoryResult {
     const visitorResult = this.getVisitor();
     let visitor: VisitorReference | undefined = undefined;
     if (typeof visitorResult == "number") {
-      if (
-        visitorResult == SiteStateRepositoryError.MalformedData ||
-        visitorResult == SiteStateRepositoryError.InternalError
-      ) {
-        return visitorResult;
-      }
+      return visitorResult;
     } else {
       visitor = visitorResult;
     }
@@ -56,6 +52,8 @@ export class WebStorageSiteStateRepository implements SiteStateRepository {
         sessionResult == SiteStateRepositoryError.InternalError
       ) {
         return sessionResult;
+      } else {
+        return { visitor, session: undefined, section: undefined };
       }
     } else {
       session = sessionResult;

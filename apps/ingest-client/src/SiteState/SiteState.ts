@@ -27,5 +27,5 @@ export function isSiteStateRepositoryError(
 export interface SiteStateRepository {
   getSiteState(): SiteStateRepositoryResult;
   setSiteState(state: SiteState): SiteStateRepositoryResult;
-  clearSiteState(): void;
+  clearSiteState(): SiteStateRepositoryResult;
 }

@@ -1,11 +1,10 @@
-import { Click, Section, Session, Visitor } from "./Event/Event";
+import { EventManager } from "./EventManager/EventManager";
 import { HttpEventPublisher } from "./EventPublisher/HttpEventPublisher";
+import { WebStorageSiteStateRepository } from "./SiteState/WebStorageSiteStateRepository";
 
-let visitor = new Visitor();
-let session = new Session(visitor);
-let section = new Section(session);
-let click = new Click(section);
+let api_key = "abc-xyz";
+let siteStateRepository = new WebStorageSiteStateRepository(api_key);
+let publisher = new HttpEventPublisher(api_key, "http://localhost:3000");
+let eventManager = new EventManager(publisher, siteStateRepository);
 
-let publisher = new HttpEventPublisher("abc-xyz", "http://localhost:3000");
-
-publisher.publish([visitor, session, section, click]);
+eventManager.registerSection();

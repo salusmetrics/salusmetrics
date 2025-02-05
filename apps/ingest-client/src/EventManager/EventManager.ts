@@ -18,13 +18,14 @@ import {
   isSiteStateRepositoryError,
   SiteState,
   SiteStateRepository,
+  SiteStateRepositoryResult,
 } from "../SiteState/SiteState";
 
 export class EventManager implements EventRegistry {
   private publisher: EventPublisher;
   private siteStateRepository: SiteStateRepository;
   private eventQueue: ToPublishEvent[];
-  private siteStateWriteBuffer: SiteState;
+  private siteStateWriteBuffer: SiteState | undefined;
 
   constructor(
     publisher: EventPublisher,
@@ -33,17 +34,63 @@ export class EventManager implements EventRegistry {
     this.publisher = publisher;
     this.siteStateRepository = siteStateRepository;
     this.eventQueue = [];
+    this.siteStateWriteBuffer = undefined;
+  }
+
+  private getSiteState(): SiteState {
+    if (this.siteStateWriteBuffer != undefined) {
+      return this.siteStateWriteBuffer;
+    }
+    const repoValue = this.siteStateRepository.getSiteState();
+    if (isSiteStateRepositoryError(repoValue)) {
+      this.siteStateWriteBuffer = {
+        visitor: undefined,
+        session: undefined,
+        section: undefined,
+      };
+    } else {
+      this.siteStateWriteBuffer = repoValue;
+    }
+    return this.siteStateWriteBuffer;
+  }
+
+  private writeSiteState(): SiteStateRepositoryResult {
+    let result: SiteStateRepositoryResult;
+    if (this.siteStateWriteBuffer != undefined) {
+      result = this.siteStateRepository.setSiteState(this.siteStateWriteBuffer);
+    } else {
+      result = this.siteStateRepository.clearSiteState();
+    }
+    this.siteStateWriteBuffer = undefined;
+    return result;
+  }
+
+  private setVisitorReference(visitor: VisitorReference | undefined): void {
     this.siteStateWriteBuffer = {
-      visitor: undefined,
+      visitor,
       session: undefined,
       section: undefined,
     };
   }
 
+  private setSessionReference(session: SessionReference | undefined): void {
+    this.siteStateWriteBuffer = {
+      visitor: this.getSiteState().visitor,
+      session,
+      section: undefined,
+    };
+  }
+
+  private setSectionReference(section: SectionReference | undefined): void {
+    this.siteStateWriteBuffer = {
+      visitor: this.getSiteState().visitor,
+      session: this.getSiteState().session,
+      section,
+    };
+  }
+
   private flush(): RegisterEventResult {
-    const siteStateSetResult = this.siteStateRepository.setSiteState(
-      this.siteStateWriteBuffer,
-    );
+    const siteStateSetResult = this.writeSiteState();
     if (isSiteStateRepositoryError(siteStateSetResult)) {
       return RegisterEventError.InternalError;
     }
@@ -57,33 +104,21 @@ export class EventManager implements EventRegistry {
   }
 
   deregisterVisitor(): RegisterEventResult {
-    this.siteStateWriteBuffer = {
-      visitor: undefined,
-      session: undefined,
-      section: undefined,
-    };
+    this.setVisitorReference(undefined);
     return this.flush();
   }
 
   private createVisitor(): Visitor {
     const visitor = new Visitor();
-    this.siteStateWriteBuffer = {
-      visitor,
-      session: undefined,
-      section: undefined,
-    };
+    this.setVisitorReference(visitor);
     this.eventQueue.push(visitor);
     return visitor;
   }
 
   private getOrCreateVisitorReference(): VisitorReference {
-    const siteStateResult = this.siteStateRepository.getSiteState();
-    if (
-      !isSiteStateRepositoryError(siteStateResult) &&
-      siteStateResult.visitor != undefined
-    ) {
-      this.siteStateWriteBuffer = siteStateResult;
-      return siteStateResult.visitor;
+    const siteStateVisitor = this.getSiteState().visitor;
+    if (siteStateVisitor != undefined) {
+      return siteStateVisitor;
     }
     return this.createVisitor();
   }
@@ -94,41 +129,22 @@ export class EventManager implements EventRegistry {
   }
 
   deregisterSession(): RegisterEventResult {
-    let siteState = this.siteStateRepository.getSiteState();
-    if (isSiteStateRepositoryError(siteState)) {
-      this.siteStateWriteBuffer = {
-        visitor: undefined,
-        session: undefined,
-        section: undefined,
-      };
-    } else {
-      this.siteStateWriteBuffer = {
-        ...siteState,
-        session: undefined,
-        section: undefined,
-      };
-    }
+    this.setSessionReference(undefined);
     return this.flush();
   }
 
   private createSession(): Session {
     const visitor = this.getOrCreateVisitorReference();
     const session = new Session(visitor);
-    this.siteStateWriteBuffer.session = session;
-    this.siteStateWriteBuffer.section = undefined;
+    this.setSessionReference(session);
     this.eventQueue.push(session);
     return session;
   }
 
   private getOrCreateSessionReference(): SessionReference {
-    this.getOrCreateVisitorReference();
-    const siteStateResult = this.siteStateRepository.getSiteState();
-    if (
-      !isSiteStateRepositoryError(siteStateResult) &&
-      siteStateResult.session != undefined
-    ) {
-      this.siteStateWriteBuffer = siteStateResult;
-      return siteStateResult.session;
+    const siteStateSession = this.getSiteState().session;
+    if (siteStateSession != undefined) {
+      return siteStateSession;
     }
     return this.createSession();
   }
@@ -139,36 +155,22 @@ export class EventManager implements EventRegistry {
   }
 
   deregisterSection(): RegisterEventResult {
-    let siteState = this.siteStateRepository.getSiteState();
-    if (isSiteStateRepositoryError(siteState)) {
-      this.siteStateWriteBuffer = {
-        visitor: undefined,
-        session: undefined,
-        section: undefined,
-      };
-    } else {
-      this.siteStateWriteBuffer = { ...siteState, section: undefined };
-    }
+    this.setSectionReference(undefined);
     return this.flush();
   }
 
   private createSection(): Section {
     const session = this.getOrCreateSessionReference();
     const section = new Section(session);
-    this.siteStateWriteBuffer.section = section;
+    this.setSectionReference(section);
     this.eventQueue.push(section);
     return section;
   }
 
   private getOrCreateSectionReference(): SectionReference {
-    this.getOrCreateSessionReference();
-    const siteStateResult = this.siteStateRepository.getSiteState();
-    if (
-      !isSiteStateRepositoryError(siteStateResult) &&
-      siteStateResult.section != undefined
-    ) {
-      this.siteStateWriteBuffer = siteStateResult;
-      return siteStateResult.section;
+    const siteStateSection = this.getSiteState().section;
+    if (siteStateSection != undefined) {
+      return siteStateSection;
     }
     return this.createSection();
   }

@@ -14,9 +14,9 @@ ingest = { path = "src/ingest" }
 conf = { path = "src/conf" }
 axum = "0.8.1"
 clickhouse = { version = "0.13.1", features = ["test-util", "time", "uuid"] }
-config = { version = "0.15.6", features = ["toml"] }
+config = { version = "0.15.7", features = ["toml"] }
 http = "1.2.0"
-hyper = "1.5.2"
+hyper = "1.6.0"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_repr = "0.1.19"
 thiserror = "2.0.11"
@@ -40,4 +40,4 @@ tracing-subscriber = { version = "0.3.19", features = [
     "json",
     "tracing-log",
 ] }
-uuid = { version = "1.12.0", features = ["v7"] }
+uuid = { version = "1.12.1", features = ["v7"] }
