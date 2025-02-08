@@ -8,7 +8,7 @@ import {
   VisitorReference,
 } from "../Event/Event";
 import {
-  EventRegistry,
+  SyncEventRegistry,
   RegisterEventError,
   RegisterEventResult,
 } from "../Event/EventRegistry";
@@ -21,7 +21,7 @@ import {
   SiteStateRepositoryResult,
 } from "../SiteState/SiteState";
 
-export class EventManager implements EventRegistry {
+export class EventManager implements SyncEventRegistry {
   private publisher: EventPublisher;
   private siteStateRepository: SiteStateRepository;
   private eventQueue: ToPublishEvent[];
@@ -94,7 +94,7 @@ export class EventManager implements EventRegistry {
     if (isSiteStateRepositoryError(siteStateSetResult)) {
       return RegisterEventError.InternalError;
     }
-    this.publisher.publish(this.eventQueue);
+    this.publisher.publish(this.eventQueue.map((e) => e.toPublishEvent()));
     this.eventQueue = [];
   }
 
