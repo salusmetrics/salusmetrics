@@ -7,6 +7,7 @@ export interface EventPublishSuccess {
 export enum EventPublishError {
   BadRequest,
   ConfigurationError,
+  FetchError,
   InternalServerError,
   Timeout,
 }

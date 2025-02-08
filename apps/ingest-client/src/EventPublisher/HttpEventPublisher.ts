@@ -24,21 +24,25 @@ export class HttpEventPublisher implements EventPublisher {
   }
 
   async publish(events: PublishEvent[]): Promise<EventPublishResult> {
-    const response = await fetch(this.createRequest(events));
+    try {
+      const response = await fetch(this.createRequest(events));
 
-    if (response.ok) {
-      return { count: events.length };
+      if (response.ok) {
+        return { count: events.length };
+      }
+
+      if (response.status == 500) {
+        return EventPublishError.InternalServerError;
+      }
+
+      if (response.status == 400) {
+        return EventPublishError.BadRequest;
+      }
+
+      return EventPublishError.Timeout;
+    } catch (e) {
+      return EventPublishError.FetchError;
     }
-
-    if (response.status == 500) {
-      return EventPublishError.InternalServerError;
-    }
-
-    if (response.status == 400) {
-      return EventPublishError.BadRequest;
-    }
-
-    return EventPublishError.Timeout;
   }
 
   private createRequest(events: PublishEvent[]): Request {

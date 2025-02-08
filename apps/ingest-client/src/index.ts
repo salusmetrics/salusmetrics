@@ -22,4 +22,7 @@ let gateway = new WorkerPublisherGateway({ api_key, host }, (e) =>
   console.log(e),
 );
 
-gateway.publish([visitor.toPublishEvent()]);
+gateway
+  .publish([visitor.toPublishEvent()])
+  .then((e) => console.log("success:", e))
+  .catch((e) => console.error("error:", e));
