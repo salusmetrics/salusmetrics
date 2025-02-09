@@ -1,7 +1,7 @@
 import { PublishEvent } from "./PublishEvent";
 
 export interface EventPublishSuccess {
-  count: number;
+  eventCount: number;
 }
 
 export enum EventPublishError {
@@ -13,6 +13,12 @@ export enum EventPublishError {
 }
 
 export type EventPublishResult = EventPublishSuccess | EventPublishError;
+
+export function isEventPublishResultError(
+  result: EventPublishResult,
+): result is EventPublishError {
+  return typeof result == "number";
+}
 
 export interface EventPublisher {
   publish(events: PublishEvent[]): Promise<EventPublishResult>;

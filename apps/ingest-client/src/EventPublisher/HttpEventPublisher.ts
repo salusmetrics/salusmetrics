@@ -28,7 +28,7 @@ export class HttpEventPublisher implements EventPublisher {
       const response = await fetch(this.createRequest(events));
 
       if (response.ok) {
-        return { count: events.length };
+        return { eventCount: events.length };
       }
 
       if (response.status == 500) {

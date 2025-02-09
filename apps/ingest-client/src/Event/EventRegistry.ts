@@ -1,5 +1,3 @@
-import { EventReference } from "./Event";
-
 export const enum RegisterEventError {
   BadRequestError,
   ConfigurationError,
@@ -8,23 +6,17 @@ export const enum RegisterEventError {
 
 export type RegisterEventResult = RegisterEventError | void;
 
-export interface SyncEventRegistry {
-  registerVisitor(): RegisterEventResult;
-  deregisterVisitor(): RegisterEventResult;
-  registerSession(): RegisterEventResult;
-  deregisterSession(): RegisterEventResult;
-  registerSection(): RegisterEventResult;
-  deregisterSection(): RegisterEventResult;
-  registerClick(): RegisterEventResult;
+export interface EventRegistrySuccess {
+  eventCount: number;
 }
 
 export const enum EventRegistryError {
-  BadRequestError,
+  BadRequest,
   ConfigurationError,
   InternalError,
 }
 
-export type EventRegistryResult = EventReference | EventRegistryError;
+export type EventRegistryResult = EventRegistrySuccess | EventRegistryError;
 
 export interface EventRegistry {
   registerVisitor(): Promise<EventRegistryResult>;

@@ -8,11 +8,16 @@ import {
   VisitorReference,
 } from "../Event/Event";
 import {
-  SyncEventRegistry,
-  RegisterEventError,
-  RegisterEventResult,
+  EventRegistry,
+  EventRegistryError,
+  EventRegistryResult,
 } from "../Event/EventRegistry";
-import { EventPublisher } from "../EventPublisher/EventPublisher";
+import {
+  EventPublisher,
+  EventPublishError,
+  EventPublishResult,
+  isEventPublishResultError,
+} from "../EventPublisher/EventPublisher";
 import { ToPublishEvent } from "../EventPublisher/PublishEvent";
 import {
   isSiteStateRepositoryError,
@@ -21,7 +26,7 @@ import {
   SiteStateRepositoryResult,
 } from "../SiteState/SiteState";
 
-export class EventManager implements SyncEventRegistry {
+export class EventManager implements EventRegistry {
   private publisher: EventPublisher;
   private siteStateRepository: SiteStateRepository;
   private eventQueue: ToPublishEvent[];
@@ -89,21 +94,44 @@ export class EventManager implements SyncEventRegistry {
     };
   }
 
-  private flush(): RegisterEventResult {
+  private flush(): Promise<EventRegistryResult> {
     const siteStateSetResult = this.writeSiteState();
     if (isSiteStateRepositoryError(siteStateSetResult)) {
-      return RegisterEventError.InternalError;
+      return new Promise((resolve) =>
+        resolve(EventRegistryError.InternalError),
+      );
     }
-    this.publisher.publish(this.eventQueue.map((e) => e.toPublishEvent()));
+    const promise = this.publisher
+      .publish(this.eventQueue.map((e) => e.toPublishEvent()))
+      .then((result) =>
+        this.mapEventPublishResultToEventRegistryResult(result),
+      );
     this.eventQueue = [];
+    return promise;
   }
 
-  registerVisitor(): RegisterEventResult {
+  private mapEventPublishResultToEventRegistryResult(
+    pubRes: EventPublishResult,
+  ): EventRegistryResult {
+    if (isEventPublishResultError(pubRes)) {
+      if (pubRes == EventPublishError.BadRequest) {
+        return EventRegistryError.BadRequest;
+      } else if (pubRes == EventPublishError.ConfigurationError) {
+        return EventRegistryError.ConfigurationError;
+      } else {
+        return EventRegistryError.InternalError;
+      }
+    } else {
+      return pubRes;
+    }
+  }
+
+  registerVisitor(): Promise<EventRegistryResult> {
     this.createVisitor();
     return this.flush();
   }
 
-  deregisterVisitor(): RegisterEventResult {
+  deregisterVisitor(): Promise<EventRegistryResult> {
     this.setVisitorReference(undefined);
     return this.flush();
   }
@@ -123,12 +151,12 @@ export class EventManager implements SyncEventRegistry {
     return this.createVisitor();
   }
 
-  registerSession(): RegisterEventResult {
+  registerSession(): Promise<EventRegistryResult> {
     this.createSession();
     return this.flush();
   }
 
-  deregisterSession(): RegisterEventResult {
+  deregisterSession(): Promise<EventRegistryResult> {
     this.setSessionReference(undefined);
     return this.flush();
   }
@@ -149,12 +177,12 @@ export class EventManager implements SyncEventRegistry {
     return this.createSession();
   }
 
-  registerSection(): RegisterEventResult {
+  registerSection(): Promise<EventRegistryResult> {
     this.createSection();
     return this.flush();
   }
 
-  deregisterSection(): RegisterEventResult {
+  deregisterSection(): Promise<EventRegistryResult> {
     this.setSectionReference(undefined);
     return this.flush();
   }
@@ -175,7 +203,7 @@ export class EventManager implements SyncEventRegistry {
     return this.createSection();
   }
 
-  registerClick(): RegisterEventResult {
+  registerClick(): Promise<EventRegistryResult> {
     this.createClick();
     return this.flush();
   }
