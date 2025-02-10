@@ -1,9 +1,5 @@
 import { HttpEventPublisher } from "./HttpEventPublisher";
-import {
-  EventPublisherConfigurationState,
-  EventPublishError,
-  EventPublishResult,
-} from "./EventPublisher";
+import { EventPublishError, EventPublishResult } from "./EventPublisher";
 import {
   WorkerConfigurationRequestMessage,
   WorkerConfigurationResultMessage,
@@ -13,6 +9,7 @@ import {
   WorkerPublishRequestMessage,
   WorkerPublishResultMessage,
 } from "./WorkerMessage";
+import { EventConfigurationState } from "../Event/EventConfiguration";
 
 export class WorkerPublisherProxy {
   private httpPublisher: HttpEventPublisher | undefined = undefined;
@@ -29,7 +26,7 @@ export class WorkerPublisherProxy {
       this.httpPublisher = new HttpEventPublisher(configMessage.config);
     } catch (err) {
       const errMessage: WorkerConfigurationResultMessage = {
-        configurationState: EventPublisherConfigurationState.Invalid,
+        configurationState: EventConfigurationState.Invalid,
         id: configMessage.id,
         messageType: WorkerMessageType.ConfigureResult,
       };

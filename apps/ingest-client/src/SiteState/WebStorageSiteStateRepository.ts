@@ -6,6 +6,11 @@ import {
   VisitorReference,
 } from "../Event/Event";
 import {
+  EventConfiguration,
+  EventConfigurationState,
+  validateEventConfiguration,
+} from "../Event/EventConfiguration";
+import {
   SiteState,
   SiteStateRepository,
   SiteStateRepositoryError,
@@ -20,11 +25,14 @@ export class WebStorageSiteStateRepository implements SiteStateRepository {
   private api_key: string;
   private section: SectionReference | undefined;
 
-  constructor(api_key: string) {
-    if (api_key.trim().length < 1) {
+  constructor(config: EventConfiguration) {
+    if (
+      validateEventConfiguration(config) ==
+      EventConfigurationState.InvalidApiKey
+    ) {
       throw new TypeError("invalid empty api_key");
     }
-    this.api_key = api_key;
+    this.api_key = config.api_key;
     this.section = undefined;
   }
 

@@ -1,9 +1,8 @@
+import { EventPublishError, EventPublishResult } from "./EventPublisher";
 import {
-  EventPublisherConfiguration,
-  EventPublisherConfigurationState,
-  EventPublishError,
-  EventPublishResult,
-} from "./EventPublisher";
+  EventConfiguration,
+  EventConfigurationState,
+} from "../Event/EventConfiguration";
 import { PublishEvent } from "./PublishEvent";
 
 export enum WorkerMessageType {
@@ -21,12 +20,12 @@ export interface WorkerMessage {
 
 export interface WorkerConfigurationRequestMessage extends WorkerMessage {
   messageType: WorkerMessageType.ConfigureRequest;
-  config: EventPublisherConfiguration;
+  config: EventConfiguration;
 }
 
 export interface WorkerConfigurationResultMessage extends WorkerMessage {
   messageType: WorkerMessageType.ConfigureResult;
-  configurationState: EventPublisherConfigurationState;
+  configurationState: EventConfigurationState;
 }
 
 export interface WorkerPublishErrorMessage extends WorkerMessage {

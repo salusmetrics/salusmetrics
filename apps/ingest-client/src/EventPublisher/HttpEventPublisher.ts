@@ -1,22 +1,21 @@
 import { PublishEvent } from "./PublishEvent";
 import {
   EventPublisher,
-  EventPublisherConfiguration,
-  EventPublisherConfigurationState,
   EventPublishError,
   EventPublishResult,
-  validateEventPublisherConfiguration,
 } from "./EventPublisher";
+import {
+  EventConfiguration,
+  EventConfigurationState,
+  validateEventConfiguration,
+} from "../Event/EventConfiguration";
 
 export class HttpEventPublisher implements EventPublisher {
   private api_key: string;
   private endpoint: string;
 
-  constructor(config: EventPublisherConfiguration) {
-    if (
-      validateEventPublisherConfiguration(config) !=
-      EventPublisherConfigurationState.Success
-    ) {
+  constructor(config: EventConfiguration) {
+    if (validateEventConfiguration(config) != EventConfigurationState.Success) {
       throw new Error("Invalid Event Publisher Configuration");
     }
     this.api_key = config.api_key;

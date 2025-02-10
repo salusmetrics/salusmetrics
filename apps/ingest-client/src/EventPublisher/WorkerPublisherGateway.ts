@@ -1,10 +1,9 @@
+import { EventPublisher, EventPublishResult } from "./EventPublisher";
 import {
-  EventPublisher,
-  EventPublisherConfiguration,
-  EventPublisherConfigurationState,
-  EventPublishResult,
-  validateEventPublisherConfiguration,
-} from "./EventPublisher";
+  EventConfiguration,
+  EventConfigurationState,
+  validateEventConfiguration,
+} from "../Event/EventConfiguration";
 import { PublishEvent } from "./PublishEvent";
 import {
   WorkerConfigurationRequestMessage,
@@ -31,19 +30,16 @@ export type GlobalPublishErrorHandler = (err?: string) => void;
 export class WorkerPublisherGateway implements EventPublisher {
   private workerPublisher: Worker;
   private promiseRegistry: Record<string, PromiseHandlers>;
-  private configurationState: EventPublisherConfigurationState | undefined;
+  private configurationState: EventConfigurationState | undefined;
   private errorHandler: GlobalPublishErrorHandler | undefined;
 
   constructor(
-    config: EventPublisherConfiguration,
+    config: EventConfiguration,
     errorHandler?: GlobalPublishErrorHandler,
   ) {
     this.errorHandler = errorHandler;
     this.configurationState = undefined;
-    if (
-      validateEventPublisherConfiguration(config) !=
-      EventPublisherConfigurationState.Success
-    ) {
+    if (validateEventConfiguration(config) != EventConfigurationState.Success) {
       if (this.errorHandler != undefined) {
         this.errorHandler(
           "Error constructing WorkerPublisherGateway - Invalid Configuration",
@@ -83,7 +79,7 @@ export class WorkerPublisherGateway implements EventPublisher {
     if (workerMessage.messageType == WorkerMessageType.ConfigureResult) {
       this.configurationState = workerMessage.configurationState;
       if (
-        this.configurationState != EventPublisherConfigurationState.Success &&
+        this.configurationState != EventConfigurationState.Success &&
         this.errorHandler != undefined
       ) {
         this.errorHandler("Worker event publisher failed");
@@ -138,7 +134,7 @@ export class WorkerPublisherGateway implements EventPublisher {
     this.workerPublisher.postMessage(publishMessage);
   }
 
-  private postConfigRequest(config: EventPublisherConfiguration): void {
+  private postConfigRequest(config: EventConfiguration): void {
     const configMessage: WorkerConfigurationRequestMessage = {
       config,
       id: uuidv7(),
