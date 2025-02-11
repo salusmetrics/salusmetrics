@@ -1,14 +1,14 @@
-import { PublishEvent } from "./PublishEvent";
+import { PublishEvent } from "../PublishEvent";
 import {
   EventPublisher,
   EventPublishError,
   EventPublishResult,
-} from "./EventPublisher";
+} from "../EventPublisher";
 import {
   EventConfiguration,
   EventConfigurationState,
   validateEventConfiguration,
-} from "../Event/EventConfiguration";
+} from "../../Event/EventConfiguration";
 
 export class HttpEventPublisher implements EventPublisher {
   private api_key: string;
@@ -52,7 +52,6 @@ export class HttpEventPublisher implements EventPublisher {
         "content-type": "application/json",
         "api-key": this.api_key,
       },
-      priority: "low",
       keepalive: true,
       body: JSON.stringify(events),
     });

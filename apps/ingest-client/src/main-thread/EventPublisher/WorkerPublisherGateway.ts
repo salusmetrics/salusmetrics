@@ -1,10 +1,13 @@
-import { EventPublisher, EventPublishResult } from "./EventPublisher";
 import {
   EventConfiguration,
   EventConfigurationState,
   validateEventConfiguration,
-} from "../Event/EventConfiguration";
-import { PublishEvent } from "./PublishEvent";
+} from "common/Event/EventConfiguration";
+import {
+  EventPublisher,
+  EventPublishResult,
+} from "common/EventPublisher/EventPublisher";
+import { PublishEvent } from "common/EventPublisher/PublishEvent";
 import {
   WorkerConfigurationRequestMessage,
   WorkerConfigurationResultMessage,
@@ -12,7 +15,7 @@ import {
   WorkerPublishErrorMessage,
   WorkerPublishRequestMessage,
   WorkerPublishResultMessage,
-} from "./WorkerMessage";
+} from "common/EventPublisher/Worker/WorkerMessage";
 import { v7 as uuidv7 } from "uuid";
 
 type ResolveEventPublishResult = (

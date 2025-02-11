@@ -6,25 +6,25 @@ import {
   SessionReference,
   Visitor,
   VisitorReference,
-} from "../Event/Event";
+} from "common/Event/Event";
 import {
   EventRegistry,
   EventRegistryError,
   EventRegistryResult,
-} from "../Event/EventRegistry";
+} from "common/Event/EventRegistry";
 import {
   EventPublisher,
   EventPublishError,
   EventPublishResult,
   isEventPublishResultError,
-} from "../EventPublisher/EventPublisher";
-import { ToPublishEvent } from "../EventPublisher/PublishEvent";
+} from "common/EventPublisher/EventPublisher";
+import { ToPublishEvent } from "common/EventPublisher/PublishEvent";
 import {
   isSiteStateRepositoryError,
   SiteState,
   SiteStateRepository,
   SiteStateRepositoryResult,
-} from "../SiteState/SiteState";
+} from "common/SiteState/SiteState";
 
 export class EventManager implements EventRegistry {
   private publisher: EventPublisher;
@@ -189,7 +189,7 @@ export class EventManager implements EventRegistry {
 
   private createSection(): Section {
     const session = this.getOrCreateSessionReference();
-    const section = new Section(session);
+    const section = new Section(session, location.toString(), document.title);
     this.setSectionReference(section);
     this.eventQueue.push(section);
     return section;

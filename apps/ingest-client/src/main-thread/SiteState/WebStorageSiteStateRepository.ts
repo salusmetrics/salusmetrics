@@ -4,18 +4,18 @@ import {
   SectionReference,
   SessionReference,
   VisitorReference,
-} from "../Event/Event";
+} from "common/Event/Event";
 import {
   EventConfiguration,
   EventConfigurationState,
   validateEventConfiguration,
-} from "../Event/EventConfiguration";
+} from "common/Event/EventConfiguration";
 import {
   SiteState,
   SiteStateRepository,
   SiteStateRepositoryError,
   SiteStateRepositoryResult,
-} from "./SiteState";
+} from "common/SiteState/SiteState";
 
 const PREFIX: string = "SALUS";
 const VISITOR_SUFFIX: string = "VISITOR";

@@ -1,5 +1,9 @@
-import { HttpEventPublisher } from "./HttpEventPublisher";
-import { EventPublishError, EventPublishResult } from "./EventPublisher";
+import { EventConfigurationState } from "common/Event/EventConfiguration";
+import {
+  EventPublishError,
+  EventPublishResult,
+} from "common/EventPublisher/EventPublisher";
+import { HttpEventPublisher } from "common/EventPublisher/Http/HttpEventPublisher";
 import {
   WorkerConfigurationRequestMessage,
   WorkerConfigurationResultMessage,
@@ -8,8 +12,7 @@ import {
   WorkerMessageType,
   WorkerPublishRequestMessage,
   WorkerPublishResultMessage,
-} from "./WorkerMessage";
-import { EventConfigurationState } from "../Event/EventConfiguration";
+} from "common/EventPublisher/Worker/WorkerMessage";
 
 export class WorkerPublisherProxy {
   private httpPublisher: HttpEventPublisher | undefined = undefined;

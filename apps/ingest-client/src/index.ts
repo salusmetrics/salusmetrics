@@ -1,9 +1,7 @@
-// import { Visitor } from "./Event/Event";
-import { EventConfiguration } from "./Event/EventConfiguration";
-import { EventManager } from "./EventManager/EventManager";
-// import { HttpEventPublisher } from "./EventPublisher/HttpEventPublisher";
-import { WorkerPublisherGateway } from "./EventPublisher/WorkerPublisherGateway";
-import { WebStorageSiteStateRepository } from "./SiteState/WebStorageSiteStateRepository";
+import { EventConfiguration } from "common/Event/EventConfiguration";
+import { EventManager } from "main-thread/EventManager/EventManager";
+import { WorkerPublisherGateway } from "main-thread/EventPublisher/WorkerPublisherGateway";
+import { WebStorageSiteStateRepository } from "main-thread/SiteState/WebStorageSiteStateRepository";
 
 const config: EventConfiguration = {
   api_key: "abc-xyz",

@@ -22,3 +22,4 @@ Cargo.lock
 node_modules/
 
 apps/ingest-client/dist/
+apps/ingest-client/built/

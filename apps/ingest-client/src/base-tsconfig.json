@@ -1,0 +1,31 @@
+{
+  "extends": "@tsconfig/strictest/tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../built/local",
+
+    "baseUrl": ".",
+    "paths": {
+      "common/*": ["./common/*"],
+      "dedicated-worker/*": ["./dedicated-worker/*"],
+      "main-thread/*": ["./main-thread/*"]
+    },
+
+    "pretty": true,
+    "lib": ["ES2023"],
+    "target": "ES6",
+    "module": "ESNEXT",
+    "moduleResolution": "bundler",
+
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "noEmitOnError": true,
+
+    "allowJs": true
+  }
+}

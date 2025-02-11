@@ -1,4 +1,4 @@
-import { PublishEvent } from "../EventPublisher/PublishEvent";
+import { PublishEvent } from "common/EventPublisher/PublishEvent";
 import {
   v7 as uuidv7,
   validate as uuidValidate,
@@ -104,21 +104,21 @@ export class Section implements SectionEvent, SectionReference {
   readonly event_type: EventType.Section;
   readonly id: string;
   readonly parent: SessionReference;
-  readonly location?: string;
-  readonly title?: string;
+  readonly location: string;
+  readonly title: string;
 
-  constructor(parent: SessionReference) {
+  constructor(parent: SessionReference, location: string, title: string) {
     this.event_type = EventType.Section;
     this.id = uuidv7();
     this.parent = parent;
-    this.location = location.toString();
+    this.location = location;
+    this.title = title;
   }
 
   toPublishEvent(): PublishEvent {
     const attrs: Record<string, string> = { p: this.parent.id };
-    if (this.location != undefined) {
-      attrs["l"] = this.location;
-    }
+    attrs["l"] = this.location;
+    attrs["t"] = this.title;
     return {
       t: this.event_type,
       i: this.id,

@@ -1,0 +1,10 @@
+{
+  "extends": "./base-tsconfig.json",
+  "files": ["index.ts"],
+  "include": [],
+  "references": [
+    { "path": "./common" },
+    { "path": "./dedicated-worker" },
+    { "path": "./main-thread" }
+  ]
+}

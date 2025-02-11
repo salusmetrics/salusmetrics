@@ -1,9 +1,9 @@
-import { EventPublishError, EventPublishResult } from "./EventPublisher";
+import { EventPublishError, EventPublishResult } from "../EventPublisher";
 import {
   EventConfiguration,
   EventConfigurationState,
-} from "../Event/EventConfiguration";
-import { PublishEvent } from "./PublishEvent";
+} from "../../Event/EventConfiguration";
+import { PublishEvent } from "../PublishEvent";
 
 export enum WorkerMessageType {
   ConfigureRequest,
