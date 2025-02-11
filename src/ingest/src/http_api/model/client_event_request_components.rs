@@ -84,12 +84,12 @@ impl TryFrom<&HeaderMap> for ClientEventRequestHeaders {
     type Error = ClientEventRequestError;
 
     fn try_from(value: &HeaderMap) -> Result<Self, Self::Error> {
-        let referer = value
-            .get(header::REFERER)
+        let origin = value
+            .get(header::ORIGIN)
             .ok_or(ClientEventRequestError::InvalidRequestHeaders)?
             .to_str()
             .map_err(|_| ClientEventRequestError::InvalidRequestHeaders)?;
-        let site = referer
+        let site = origin
             .parse::<Uri>()
             .map_err(|_| ClientEventRequestError::InvalidRequestHeaders)?
             .host()
@@ -131,7 +131,7 @@ mod tests {
     fn test_from_header_map() {
         // Positive test case
         let mut valid_headers = HeaderMap::new();
-        valid_headers.insert(header::REFERER, "http://test.com/test/dir".parse().unwrap());
+        valid_headers.insert(header::ORIGIN, "http://test.com/test/dir".parse().unwrap());
         valid_headers.insert(API_KEY_HTTP_HEADER, "1234-5678-90".parse().unwrap());
 
         if ClientEventRequestHeaders::try_from(&valid_headers).is_err() {
@@ -140,16 +140,16 @@ mod tests {
         }
 
         // Negative test cases
-        let mut invalid_referer = HeaderMap::new();
-        invalid_referer.insert(API_KEY_HTTP_HEADER, "1234-5678-90".parse().unwrap());
+        let mut invalid_origin = HeaderMap::new();
+        invalid_origin.insert(API_KEY_HTTP_HEADER, "1234-5678-90".parse().unwrap());
         assert_eq!(
-            ClientEventRequestHeaders::try_from(&invalid_referer).unwrap_err(),
+            ClientEventRequestHeaders::try_from(&invalid_origin).unwrap_err(),
             ClientEventRequestError::InvalidRequestHeaders,
-            "Should fail with no valid referer"
+            "Should fail with no valid origin"
         );
 
         let mut invalid_api_key = HeaderMap::new();
-        invalid_api_key.insert(header::REFERER, "http://test.com/test/dir".parse().unwrap());
+        invalid_api_key.insert(header::ORIGIN, "http://test.com/test/dir".parse().unwrap());
         assert_eq!(
             ClientEventRequestHeaders::try_from(&invalid_api_key).unwrap_err(),
             ClientEventRequestError::ApiKey,

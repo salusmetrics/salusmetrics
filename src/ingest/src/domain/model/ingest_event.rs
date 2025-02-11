@@ -178,7 +178,7 @@ pub struct SessionEvent {
     /// from the `id` field above
     ts: OffsetDateTime,
     /// `parent` identifies the `Visitor` which this session is associated with
-    parent: Uuid,
+    pub parent: Uuid,
 }
 
 impl CommonEvent for &SessionEvent {
@@ -221,11 +221,6 @@ impl SessionEvent {
             parent,
         })
     }
-
-    /// Get the `Uuid` id for the parent `VisitorEvent` for this `SessionEvent`
-    pub fn parent(&self) -> Uuid {
-        self.parent
-    }
 }
 
 /// `SectionEvent` represents an event for which the associated Visitor in a
@@ -242,13 +237,18 @@ pub struct SectionEvent {
     /// `id` is a `Uuid` that must be a UUIDv7 and must have an associated
     /// timestamp within a certain range of now in order to be considered valid
     /// for ingestion.
-    id: Uuid,
+    pub id: Uuid,
     /// `ts` is the timestamp, represented as a
     /// `time::offset_date_time::OffsetDateTime` value. This is strictly derived
     /// from the `id` field above
     ts: OffsetDateTime,
     /// `parent` identifies the `Session` which this section is associated with
-    parent: Uuid,
+    pub parent: Uuid,
+    /// `location` specifies the full location string portion of the URI
+    /// for the section, if it exists
+    pub location: Option<String>,
+    /// `title` identifies the title of the section, if it exists
+    pub title: Option<String>,
 }
 
 impl CommonEvent for &SectionEvent {
@@ -273,8 +273,15 @@ impl SectionEvent {
         site: Site,
         id: Uuid,
         parent: Uuid,
+        location: Option<String>,
+        title: Option<String>,
     ) -> Result<Self, IngestEventError> {
-        Self::try_new_with_core_event(IngestEventCore::try_new(api_key, site, id)?, parent)
+        Self::try_new_with_core_event(
+            IngestEventCore::try_new(api_key, site, id)?,
+            parent,
+            location,
+            title,
+        )
     }
 
     /// `SectionEvent` constructor with `IngestEventCore` already created for
@@ -282,6 +289,8 @@ impl SectionEvent {
     fn try_new_with_core_event(
         core: IngestEventCore,
         parent: Uuid,
+        location: Option<String>,
+        title: Option<String>,
     ) -> Result<Self, IngestEventError> {
         Ok(Self {
             api_key: core.api_key,
@@ -289,12 +298,9 @@ impl SectionEvent {
             site: core.site,
             ts: core.ts,
             parent,
+            location,
+            title,
         })
-    }
-
-    /// Get the `Uuid` id for the parent `SessionEvent` for this `SectionEvent`
-    pub fn parent(&self) -> Uuid {
-        self.parent
     }
 }
 
@@ -315,7 +321,7 @@ pub struct ClickEvent {
     /// from the `id` field above
     ts: OffsetDateTime,
     /// `parent` identifies the `Section` which this click is associated with
-    parent: Uuid,
+    pub parent: Uuid,
 }
 
 impl CommonEvent for &ClickEvent {
@@ -357,11 +363,6 @@ impl ClickEvent {
             ts: core.ts,
             parent,
         })
-    }
-
-    /// Get the `Uuid` id for the parent `SectionEvent` for this `ClickEvent`
-    pub fn parent(&self) -> Uuid {
-        self.parent
     }
 }
 
@@ -515,6 +516,8 @@ mod tests {
             Site::new(SITE),
             Uuid::now_v7(),
             Uuid::now_v7(),
+            Some("/path/to/section.ext?foo=bar&bar=foo#last".to_owned()),
+            Some("Section Title".to_owned()),
         ) else {
             panic!("Expected valid SectionEvent");
         };

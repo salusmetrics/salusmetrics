@@ -95,7 +95,7 @@ impl TryFrom<&SessionEvent> for ClickhouseEventRecord {
         let builder = ClickhouseEventRecordBuilder::from(&event);
         builder
             .event_type(ClickhouseEventRecordType::Session)
-            .parent(event.parent())
+            .parent(event.parent)
             .try_build()
     }
 }
@@ -106,11 +106,17 @@ impl TryFrom<&SectionEvent> for ClickhouseEventRecord {
     type Error = IngestRepositoryError;
     #[instrument]
     fn try_from(event: &SectionEvent) -> Result<Self, Self::Error> {
-        let builder = ClickhouseEventRecordBuilder::from(&event);
-        builder
+        let mut builder = ClickhouseEventRecordBuilder::from(&event);
+        builder = builder
             .event_type(ClickhouseEventRecordType::Section)
-            .parent(event.parent())
-            .try_build()
+            .parent(event.parent);
+        if let Some(location) = &event.location {
+            builder = builder.add_attr("location".to_owned(), location.to_owned());
+        }
+        if let Some(title) = &event.title {
+            builder = builder.add_attr("title".to_owned(), title.to_owned());
+        }
+        builder.try_build()
     }
 }
 
@@ -123,7 +129,7 @@ impl TryFrom<&ClickEvent> for ClickhouseEventRecord {
         let builder = ClickhouseEventRecordBuilder::from(&event);
         builder
             .event_type(ClickhouseEventRecordType::Click)
-            .parent(event.parent())
+            .parent(event.parent)
             .try_build()
     }
 }
@@ -268,6 +274,8 @@ mod tests {
             Site::new("http://salusmetrics.com"),
             uuid_section,
             uuid_session,
+            Some("/path/to/section".to_owned()),
+            Some("Section Title".to_owned()),
         ) else {
             panic!("Expected valid SectionEvent to be created");
         };

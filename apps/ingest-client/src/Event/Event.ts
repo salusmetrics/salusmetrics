@@ -91,7 +91,7 @@ export class Session implements SessionEvent, SessionReference {
   }
 
   toPublishEvent(): PublishEvent {
-    const attrs: Record<string, string> = { parent: this.parent.id };
+    const attrs: Record<string, string> = { p: this.parent.id };
     return {
       t: this.event_type,
       i: this.id,
@@ -104,15 +104,21 @@ export class Section implements SectionEvent, SectionReference {
   readonly event_type: EventType.Section;
   readonly id: string;
   readonly parent: SessionReference;
+  readonly location?: string;
+  readonly title?: string;
 
   constructor(parent: SessionReference) {
     this.event_type = EventType.Section;
     this.id = uuidv7();
     this.parent = parent;
+    this.location = location.toString();
   }
 
   toPublishEvent(): PublishEvent {
-    const attrs: Record<string, string> = { parent: this.parent.id };
+    const attrs: Record<string, string> = { p: this.parent.id };
+    if (this.location != undefined) {
+      attrs["l"] = this.location;
+    }
     return {
       t: this.event_type,
       i: this.id,
@@ -133,7 +139,7 @@ export class Click implements ClickEvent {
   }
 
   toPublishEvent(): PublishEvent {
-    const attrs: Record<string, string> = { parent: this.parent.id };
+    const attrs: Record<string, string> = { p: this.parent.id };
     return {
       t: this.event_type,
       i: this.id,

@@ -147,7 +147,7 @@ impl TryFrom<&ClientEventRequest> for SessionEvent {
         );
 
         let parent = value
-            .attr("parent")
+            .attr("p")
             .ok_or(ClientEventRequestError::InvalidRequestBody)?;
         let parent_uuid =
             Uuid::parse_str(parent).map_err(|_| ClientEventRequestError::InvalidRequestBody)?;
@@ -171,15 +171,19 @@ impl TryFrom<&ClientEventRequest> for SectionEvent {
         );
 
         let parent = value
-            .attr("parent")
+            .attr("p")
             .ok_or(ClientEventRequestError::InvalidRequestBody)?;
         let parent_uuid =
             Uuid::parse_str(parent).map_err(|_| ClientEventRequestError::InvalidRequestBody)?;
+        let location = value.attr("l").map(|p| p.to_owned());
+        let title = value.attr("title").map(|t| t.to_owned());
         SectionEvent::try_new(
             ApiKey::new(&value.headers.api_key),
             Site::new(&value.headers.site),
             value.body.id,
             parent_uuid,
+            location,
+            title,
         )
         .map_err(|e| e.into())
     }
@@ -195,7 +199,7 @@ impl TryFrom<&ClientEventRequest> for ClickEvent {
         );
 
         let parent = value
-            .attr("parent")
+            .attr("p")
             .ok_or(ClientEventRequestError::InvalidRequestBody)?;
         let parent_uuid =
             Uuid::parse_str(parent).map_err(|_| ClientEventRequestError::InvalidRequestBody)?;
@@ -278,7 +282,7 @@ mod tests {
 
         // Session
         let session_attrs: HashMap<String, String> =
-            HashMap::from([("parent".to_owned(), parent_id.to_string())]);
+            HashMap::from([("p".to_owned(), parent_id.to_string())]);
         let valid_session_request = ClientEventRequest {
             body: ClientEventRequestBody {
                 id: uuid_now,
@@ -296,14 +300,14 @@ mod tests {
                 assert_eq!(session_event.api_key().value(), API_KEY);
                 assert_eq!(session_event.site().value(), SITE);
                 assert_eq!(session_event.id(), uuid_now);
-                assert_eq!(session_event.parent(), parent_id);
+                assert_eq!(session_event.parent, parent_id);
             }
             _ => panic!("Expected valid session event to be generated"),
         }
 
         // Section
         let section_attrs: HashMap<String, String> =
-            HashMap::from([("parent".to_owned(), parent_id.to_string())]);
+            HashMap::from([("p".to_owned(), parent_id.to_string())]);
         let valid_section_request = ClientEventRequest {
             body: ClientEventRequestBody {
                 id: uuid_now,
@@ -321,14 +325,14 @@ mod tests {
                 assert_eq!(section_event.api_key().value(), API_KEY);
                 assert_eq!(section_event.site().value(), SITE);
                 assert_eq!(section_event.id(), uuid_now);
-                assert_eq!(section_event.parent(), parent_id);
+                assert_eq!(section_event.parent, parent_id);
             }
             _ => panic!("Expected valid section event to be generated"),
         }
 
         // Click
         let click_attrs: HashMap<String, String> =
-            HashMap::from([("parent".to_owned(), parent_id.to_string())]);
+            HashMap::from([("p".to_owned(), parent_id.to_string())]);
         let valid_click_request = ClientEventRequest {
             body: ClientEventRequestBody {
                 id: uuid_now,
@@ -346,7 +350,7 @@ mod tests {
                 assert_eq!(click_event.api_key().value(), API_KEY);
                 assert_eq!(click_event.site().value(), SITE);
                 assert_eq!(click_event.id(), uuid_now);
-                assert_eq!(click_event.parent(), parent_id);
+                assert_eq!(click_event.parent, parent_id);
             }
             _ => panic!("Expected valid section event to be generated"),
         }

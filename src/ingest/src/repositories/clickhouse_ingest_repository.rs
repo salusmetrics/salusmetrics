@@ -59,6 +59,7 @@ impl IngestEventRepository for ClickhouseIngestRepository {
         }
         let mut records: Vec<ClickhouseEventRecord> = Vec::with_capacity(events.len());
         for event in events.iter() {
+            tracing::debug!("Incoming Record: {:?}", &event);
             match event {
                 IngestEvent::Visitor(ref evt) => {
                     if !self.event_sources.contains(&IngestEventSource::from(&evt)) {
@@ -93,6 +94,7 @@ impl IngestEventRepository for ClickhouseIngestRepository {
             })?;
 
         for record in records.iter() {
+            tracing::debug!("To Insert: {:?}", &record);
             insert.write(record).await.map_err(|e| {
                 tracing::error!("Encountered error inserting records: {e}");
                 IngestRepositoryError::Repository
