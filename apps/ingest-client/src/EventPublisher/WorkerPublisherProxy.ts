@@ -15,8 +15,12 @@ export class WorkerPublisherProxy {
   private httpPublisher: HttpEventPublisher | undefined = undefined;
   private workerContext: DedicatedWorkerGlobalScope;
 
-  constructor(workerContext: DedicatedWorkerGlobalScope) {
-    this.workerContext = workerContext;
+  constructor(workerContext: DedicatedWorkerGlobalScope | Window) {
+    if (workerContext instanceof DedicatedWorkerGlobalScope) {
+      this.workerContext = workerContext;
+    } else {
+      throw new Error("Worker Publisher Invoked Incorrectly");
+    }
   }
 
   private configurePublisher(

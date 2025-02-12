@@ -176,7 +176,7 @@ impl TryFrom<&ClientEventRequest> for SectionEvent {
         let parent_uuid =
             Uuid::parse_str(parent).map_err(|_| ClientEventRequestError::InvalidRequestBody)?;
         let location = value.attr("l").map(|p| p.to_owned());
-        let title = value.attr("title").map(|t| t.to_owned());
+        let title = value.attr("t").map(|t| t.to_owned());
         SectionEvent::try_new(
             ApiKey::new(&value.headers.api_key),
             Site::new(&value.headers.site),

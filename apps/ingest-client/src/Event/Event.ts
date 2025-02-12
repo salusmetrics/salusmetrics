@@ -112,12 +112,16 @@ export class Section implements SectionEvent, SectionReference {
     this.id = uuidv7();
     this.parent = parent;
     this.location = location.toString();
+    this.title = document.title;
   }
 
   toPublishEvent(): PublishEvent {
     const attrs: Record<string, string> = { p: this.parent.id };
     if (this.location != undefined) {
       attrs["l"] = this.location;
+    }
+    if (this.title != undefined) {
+      attrs["t"] = this.title;
     }
     return {
       t: this.event_type,
