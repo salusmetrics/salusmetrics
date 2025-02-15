@@ -1,13 +1,18 @@
+DROP TABLE IF EXISTS SALUS_METRICS.SESSION_EVENT;
+
 CREATE TABLE SALUS_METRICS.SESSION_EVENT (
     `api_key` LowCardinality (String) CODEC (ZSTD (1)),
     `site` LowCardinality (String) CODEC (ZSTD (1)),
     `id` UUID CODEC (ZSTD (1)),
     `ts` DateTime CODEC(Delta(4), ZSTD(1)),
     `parent` UUID ALIAS attrs['parent'],
+    `user_agent` String ALIAS attrs['user_agent'],
     `attrs` Map (LowCardinality (String), String) CODEC (ZSTD (1))
 ) ENGINE = MergeTree
 ORDER BY
     (api_key, site, ts);
+
+DROP TABLE IF EXISTS SALUS_METRICS.session_event_mv;
 
 CREATE MATERIALIZED VIEW SALUS_METRICS.session_event_mv TO SALUS_METRICS.SESSION_EVENT AS
 SELECT

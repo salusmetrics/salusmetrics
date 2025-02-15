@@ -156,6 +156,7 @@ impl TryFrom<&ClientEventRequest> for SessionEvent {
             Site::new(&value.headers.site),
             value.body.id,
             parent_uuid,
+            value.headers.user_agent.to_owned(),
         )
         .map_err(|e| e.into())
     }
@@ -223,6 +224,8 @@ mod tests {
 
     pub const API_KEY: &str = "abc_123";
     pub const SITE: &str = "test.com";
+    pub const USER_AGENT: &str =
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0";
 
     /// This is very important in order to keep the mapping in TypeScript in
     /// line with this library
@@ -268,6 +271,7 @@ mod tests {
             headers: ClientEventRequestHeaders {
                 api_key: API_KEY.to_owned(),
                 site: SITE.to_owned(),
+                user_agent: USER_AGENT.to_owned(),
             },
         };
         let visitor_ingest_event: IngestEvent = (&valid_visitor_request).try_into().unwrap();
@@ -292,6 +296,7 @@ mod tests {
             headers: ClientEventRequestHeaders {
                 api_key: API_KEY.to_owned(),
                 site: SITE.to_owned(),
+                user_agent: USER_AGENT.to_owned(),
             },
         };
         let session_ingest_event: IngestEvent = (&valid_session_request).try_into().unwrap();
@@ -317,6 +322,7 @@ mod tests {
             headers: ClientEventRequestHeaders {
                 api_key: API_KEY.to_owned(),
                 site: SITE.to_owned(),
+                user_agent: USER_AGENT.to_owned(),
             },
         };
         let section_ingest_event: IngestEvent = (&valid_section_request).try_into().unwrap();
@@ -342,6 +348,7 @@ mod tests {
             headers: ClientEventRequestHeaders {
                 api_key: API_KEY.to_owned(),
                 site: SITE.to_owned(),
+                user_agent: USER_AGENT.to_owned(),
             },
         };
         let click_ingest_event: IngestEvent = (&valid_click_request).try_into().unwrap();

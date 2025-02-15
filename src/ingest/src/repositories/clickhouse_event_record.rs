@@ -96,6 +96,7 @@ impl TryFrom<&SessionEvent> for ClickhouseEventRecord {
         builder
             .event_type(ClickhouseEventRecordType::Session)
             .parent(event.parent)
+            .add_attr("user_agent".to_owned(), event.user_agent.to_owned())
             .try_build()
     }
 }
@@ -260,6 +261,8 @@ mod tests {
             Site::new("http://salusmetrics.com"),
             uuid_session,
             uuid_visitor,
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0"
+                .to_owned(),
         ) else {
             panic!("Expected valid SessionEvent to be created");
         };

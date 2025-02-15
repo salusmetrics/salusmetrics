@@ -66,14 +66,20 @@ impl ClientEventRequestBody {
 pub struct ClientEventRequestHeaders {
     pub api_key: String,
     pub site: String,
+    pub user_agent: String,
 }
 
 impl ClientEventRequestHeaders {
     /// `ClientEventRequestHeaders` constructor. Takes an `ApiKey` and `Site` as arguments
-    pub fn new(api_key: impl AsRef<str>, site: impl AsRef<str>) -> Self {
+    pub fn new(
+        api_key: impl AsRef<str>,
+        site: impl AsRef<str>,
+        user_agent: impl AsRef<str>,
+    ) -> Self {
         ClientEventRequestHeaders {
             api_key: api_key.as_ref().to_owned(),
             site: site.as_ref().to_owned(),
+            user_agent: user_agent.as_ref().to_owned(),
         }
     }
 }
@@ -101,7 +107,17 @@ impl TryFrom<&HeaderMap> for ClientEventRequestHeaders {
             .to_str()
             .map_err(|_| ClientEventRequestError::ApiKey)?
             .to_string();
-        Ok(ClientEventRequestHeaders { api_key, site })
+        let user_agent = value
+            .get(header::USER_AGENT)
+            .ok_or(ClientEventRequestError::InvalidRequestHeaders)?
+            .to_str()
+            .map_err(|_| ClientEventRequestError::InvalidRequestHeaders)?
+            .to_string();
+        Ok(ClientEventRequestHeaders {
+            api_key,
+            site,
+            user_agent,
+        })
     }
 }
 
@@ -133,6 +149,12 @@ mod tests {
         let mut valid_headers = HeaderMap::new();
         valid_headers.insert(header::ORIGIN, "http://test.com/test/dir".parse().unwrap());
         valid_headers.insert(API_KEY_HTTP_HEADER, "1234-5678-90".parse().unwrap());
+        valid_headers.insert(
+            header::USER_AGENT,
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0"
+                .parse()
+                .unwrap(),
+        );
 
         if ClientEventRequestHeaders::try_from(&valid_headers).is_err() {
             println!("headers: {:?}", valid_headers);
@@ -142,6 +164,12 @@ mod tests {
         // Negative test cases
         let mut invalid_origin = HeaderMap::new();
         invalid_origin.insert(API_KEY_HTTP_HEADER, "1234-5678-90".parse().unwrap());
+        invalid_origin.insert(
+            header::USER_AGENT,
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0"
+                .parse()
+                .unwrap(),
+        );
         assert_eq!(
             ClientEventRequestHeaders::try_from(&invalid_origin).unwrap_err(),
             ClientEventRequestError::InvalidRequestHeaders,
@@ -150,10 +178,25 @@ mod tests {
 
         let mut invalid_api_key = HeaderMap::new();
         invalid_api_key.insert(header::ORIGIN, "http://test.com/test/dir".parse().unwrap());
+        invalid_api_key.insert(
+            header::USER_AGENT,
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0"
+                .parse()
+                .unwrap(),
+        );
         assert_eq!(
             ClientEventRequestHeaders::try_from(&invalid_api_key).unwrap_err(),
             ClientEventRequestError::ApiKey,
             "Should fail with no valid api key"
+        );
+
+        let mut invalid_ua = HeaderMap::new();
+        invalid_ua.insert(API_KEY_HTTP_HEADER, "1234-5678-90".parse().unwrap());
+        invalid_ua.insert(header::ORIGIN, "http://test.com/test/dir".parse().unwrap());
+        assert_eq!(
+            ClientEventRequestHeaders::try_from(&invalid_ua).unwrap_err(),
+            ClientEventRequestError::InvalidRequestHeaders,
+            "Should fail with no valid user agent"
         );
     }
 }

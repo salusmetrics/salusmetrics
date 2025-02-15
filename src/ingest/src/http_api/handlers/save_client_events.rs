@@ -88,6 +88,7 @@ mod tests {
             ClientEventRequestHeaders {
                 api_key: "abc-123".to_owned(),
                 site: "test.com".to_owned(),
+                user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0".to_owned(),
             },
             Json(valid_request_bodies),
         )
@@ -106,6 +107,7 @@ mod tests {
             ClientEventRequestHeaders {
                 api_key: "abc-123".to_owned(),
                 site: "test.com".to_owned(),
+                user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0".to_owned(),
             },
             Json(invalid_request_bodies),
         )

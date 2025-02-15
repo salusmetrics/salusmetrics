@@ -179,6 +179,8 @@ pub struct SessionEvent {
     ts: OffsetDateTime,
     /// `parent` identifies the `Visitor` which this session is associated with
     pub parent: Uuid,
+    /// `user_agent` records the user agent/system on which the event originated
+    pub user_agent: String,
 }
 
 impl CommonEvent for &SessionEvent {
@@ -203,8 +205,13 @@ impl SessionEvent {
         site: Site,
         id: Uuid,
         parent: Uuid,
+        user_agent: String,
     ) -> Result<Self, IngestEventError> {
-        Self::try_new_with_core_event(IngestEventCore::try_new(api_key, site, id)?, parent)
+        Self::try_new_with_core_event(
+            IngestEventCore::try_new(api_key, site, id)?,
+            parent,
+            user_agent,
+        )
     }
 
     /// `SessionEvent` constructor with `IngestEventCore` already created for
@@ -212,6 +219,7 @@ impl SessionEvent {
     fn try_new_with_core_event(
         core: IngestEventCore,
         parent: Uuid,
+        user_agent: String,
     ) -> Result<Self, IngestEventError> {
         Ok(Self {
             api_key: core.api_key,
@@ -219,6 +227,7 @@ impl SessionEvent {
             site: core.site,
             ts: core.ts,
             parent,
+            user_agent,
         })
     }
 }
@@ -507,6 +516,8 @@ mod tests {
             Site::new(SITE),
             Uuid::now_v7(),
             Uuid::now_v7(),
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0"
+                .to_owned(),
         ) else {
             panic!("Expected valid SessionEvent");
         };
