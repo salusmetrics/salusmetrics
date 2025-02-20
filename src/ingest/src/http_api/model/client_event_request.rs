@@ -45,7 +45,9 @@ pub enum ClientEventRequestError {
     InvalidRequestBody,
     #[error("Invalid request headers")]
     InvalidRequestHeaders,
-    #[error("Somehow ended up trying to create event of one type with input for another - this should never happen")]
+    #[error(
+        "Somehow ended up trying to create event of one type with input for another - this should never happen"
+    )]
     TypeMismatch,
 }
 

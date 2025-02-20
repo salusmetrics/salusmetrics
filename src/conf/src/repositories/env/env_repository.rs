@@ -230,7 +230,8 @@ mod tests {
         let app_name = Uuid::now_v7().to_string();
         for (pre, post, val) in VALID_SETTINGS_ARR {
             let key = format!("{}_{}_{}", app_name, pre, post);
-            set_var(&key, val);
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            unsafe { set_var(&key, val) };
             println!("{} = {}", &key, val);
         }
         app_name
@@ -239,7 +240,8 @@ mod tests {
     /// For Testing Only - cleans up ENV variables for local test
     fn cleanup_test_env(app_name: &str) {
         for (pre, post, _) in VALID_SETTINGS_ARR {
-            remove_var(format!("{}_{}_{}", app_name, pre, post));
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            unsafe { remove_var(format!("{}_{}_{}", app_name, pre, post)) };
         }
     }
 }

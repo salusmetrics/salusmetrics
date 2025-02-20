@@ -30,7 +30,7 @@ pub enum ConfigurationRepositoryError {
 pub trait ConfigurationRepository: 'static + Clone + Send + Sync {
     /// `try_compression_settings` attempts fetch `CompressionSettings`
     fn try_compression_settings(&self)
-        -> Result<CompressionSettings, ConfigurationRepositoryError>;
+    -> Result<CompressionSettings, ConfigurationRepositoryError>;
 
     /// `try_cors_settings` attempts to fetch `CorsSettings`
     fn try_cors_settings(&self) -> Result<CorsSettings, ConfigurationRepositoryError>;

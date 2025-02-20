@@ -79,7 +79,7 @@ mod tests {
             ingest_event::{ApiKey, IngestEvent, IngestEventSource, Site, VisitorEvent},
         },
         repository::ingest_event_repository::{
-            test::MockIngestEventRepository, IngestRepositoryError,
+            IngestRepositoryError, test::MockIngestEventRepository,
         },
         service::ingest_event_service::{IngestEventService, IngestServiceError},
     };

@@ -1,4 +1,4 @@
-use axum::{routing::post, Router};
+use axum::{Router, routing::post};
 use conf::domain::service::configuration_service::ConfigurationService;
 use http::Method;
 use std::error::Error;

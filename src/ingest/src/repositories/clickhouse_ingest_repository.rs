@@ -61,22 +61,22 @@ impl IngestEventRepository for ClickhouseIngestRepository {
         for event in events.iter() {
             tracing::debug!("Incoming Record: {:?}", &event);
             match event {
-                IngestEvent::Visitor(ref evt) => {
+                IngestEvent::Visitor(evt) => {
                     if !self.event_sources.contains(&IngestEventSource::from(&evt)) {
                         return Err(IngestRepositoryError::InvalidRequest);
                     }
                 }
-                IngestEvent::Session(ref evt) => {
+                IngestEvent::Session(evt) => {
                     if !self.event_sources.contains(&IngestEventSource::from(&evt)) {
                         return Err(IngestRepositoryError::InvalidRequest);
                     }
                 }
-                IngestEvent::Section(ref evt) => {
+                IngestEvent::Section(evt) => {
                     if !self.event_sources.contains(&IngestEventSource::from(&evt)) {
                         return Err(IngestRepositoryError::InvalidRequest);
                     }
                 }
-                IngestEvent::Click(ref evt) => {
+                IngestEvent::Click(evt) => {
                     if !self.event_sources.contains(&IngestEventSource::from(&evt)) {
                         return Err(IngestRepositoryError::InvalidRequest);
                     }
@@ -131,7 +131,7 @@ async fn retrieve_event_sources(
 
 #[cfg(test)]
 mod tests {
-    use clickhouse::{test, Client};
+    use clickhouse::{Client, test};
     use uuid::Uuid;
 
     use super::*;

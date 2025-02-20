@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
 use axum::extract::FromRequestParts;
-use http::header;
 use http::HeaderMap;
 use http::StatusCode;
 use http::Uri;
+use http::header;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -139,7 +139,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use http::{header, HeaderMap};
+    use http::{HeaderMap, header};
 
     use super::*;
 
