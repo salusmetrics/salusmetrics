@@ -1,7 +1,7 @@
 # name = "salusmetrics"
 # description = "A web and app analytics package that allows for ingestion, aggregation and reporting on web ann app analytics"
 [workspace]
-members = ["src/ingest"]
+members = ["src/*"]
 resolver = "2"
 
 [workspace.package]

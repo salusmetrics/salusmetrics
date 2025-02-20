@@ -1,0 +1,29 @@
+[package]
+name = "report"
+description = "Reporting Component of salusmetrics, a web and app analytics package that allows for ingestion, aggregation and reporting on web ann app analytics"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+clickhouse = { workspace = true, features = ["time", "uuid"] }
+conf.workspace = true
+axum.workspace = true
+http.workspace = true
+hyper.workspace = true
+serde.workspace = true
+serde_repr.workspace = true
+thiserror.workspace = true
+time.workspace = true
+tokio.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+clickhouse = { workspace = true, features = ["test-util", "time", "uuid"] }
+
+[[bin]]
+name = "report_server"
+path = "bin/report_server.rs"
