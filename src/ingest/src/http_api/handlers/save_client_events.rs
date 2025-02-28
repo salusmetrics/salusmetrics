@@ -1,4 +1,5 @@
 use axum::{Json, extract::State};
+use axum_client_ip::InsecureClientIp;
 use tracing::instrument;
 
 use crate::{
@@ -21,6 +22,7 @@ use crate::{
 pub async fn save_client_events<I: IngestEventService + std::fmt::Debug>(
     State(state): State<IngestApplicationState<I>>,
     client_request_headers: ClientEventRequestHeaders,
+    client_ip: InsecureClientIp,
     Json(event_bodies): Json<Vec<ClientEventRequestBody>>,
 ) -> Result<ClientEventActionSummary, ClientEventRequestError> {
     let requests: Vec<ClientEventRequest> = event_bodies
@@ -28,6 +30,7 @@ pub async fn save_client_events<I: IngestEventService + std::fmt::Debug>(
         .map(|eb| ClientEventRequest {
             body: eb.to_owned(),
             headers: client_request_headers.clone(),
+            ip: client_ip.0,
         })
         .collect();
     let mut events: Vec<IngestEvent> = Vec::with_capacity(requests.len());
@@ -45,7 +48,10 @@ pub async fn save_client_events<I: IngestEventService + std::fmt::Debug>(
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::{
+        collections::HashSet,
+        net::{IpAddr, Ipv4Addr},
+    };
 
     use super::*;
     use uuid::Uuid;
@@ -65,6 +71,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_save_client_events() {
         let uuid_now = Uuid::now_v7();
+        let test_client_ip = InsecureClientIp(IpAddr::V4(Ipv4Addr::LOCALHOST));
 
         // Valid success case with non-empty request
         let mock_success_repo = MockIngestEventRepository {
@@ -90,6 +97,7 @@ mod tests {
                 site: "test.com".to_owned(),
                 user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0".to_owned(),
             },
+            test_client_ip,
             Json(valid_request_bodies),
         )
         .await;
@@ -109,6 +117,7 @@ mod tests {
                 site: "test.com".to_owned(),
                 user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0".to_owned(),
             },
+            test_client_ip,
             Json(invalid_request_bodies),
         )
         .await;

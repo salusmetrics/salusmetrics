@@ -13,6 +13,7 @@ license = "AGPL-3.0"
 ingest = { path = "src/ingest" }
 conf = { path = "src/conf" }
 axum = "0.8.1"
+axum-client-ip = "0.7.0"
 clickhouse = { version = "0.13.1", features = ["test-util", "time", "uuid"] }
 config = { version = "0.15.7", features = ["toml"] }
 http = "1.2.0"

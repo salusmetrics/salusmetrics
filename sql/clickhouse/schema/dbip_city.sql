@@ -1,0 +1,56 @@
+create table SALUS_METRICS.dbip_city_ipv4_url (
+    ip_range_start IPv4,
+    ip_range_end IPv4,
+    country_code Nullable (String),
+    state1 Nullable (String),
+    state2 Nullable (String),
+    city Nullable (String),
+    postcode Nullable (String),
+    latitude Float64,
+    longitude Float64,
+    timezone Nullable (String)
+) engine = URL (
+    'https://raw.githubusercontent.com/sapics/ip-location-db/master/dbip-city/dbip-city-ipv4.csv.gz',
+    'CSV'
+);
+
+create table SALUS_METRICS.dbip_city_ipv4 (
+   cidr String,
+   latitude Float64,
+   longitude Float64,
+   country_code String,
+   state  String,
+   city String,
+)
+engine = MergeTree()
+order by cidr;
+
+insert into
+    SALUS_METRICS.dbip_city_ipv4
+with
+    bitXor(ip_range_start, ip_range_end) as xor,
+    if(xor != 0, ceil(log2(xor)), 0) as unmatched,
+    32 - unmatched as cidr_suffix,
+    toIPv4(bitAnd(bitNot(pow(2, unmatched) - 1), ip_range_start)::UInt64) as cidr_address
+select
+    concat(toString(cidr_address),'/',toString(cidr_suffix)) as cidr,
+    latitude,
+    longitude,
+    coalesce(country_code, '') as country_code,
+    coalesce(state1, '') as state,
+    coalesce(city, '') as city
+from
+    SALUS_METRICS.dbip_city_ipv4_url;
+
+create dictionary dbip_city_ipv4_trie (
+    cidr String,
+    latitude Float64,
+    longitude Float64,
+    country_code String,
+    state String,
+    city String
+)
+primary key cidr
+source(clickhouse(table ‘dbip_city_ipv4’))
+layout(ip_trie)
+lifetime(3600);

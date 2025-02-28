@@ -93,10 +93,17 @@ impl TryFrom<&SessionEvent> for ClickhouseEventRecord {
     #[instrument]
     fn try_from(event: &SessionEvent) -> Result<Self, Self::Error> {
         let builder = ClickhouseEventRecordBuilder::from(&event);
+        let ip_key = if event.ip.is_ipv4() {
+            "ipv4".to_owned()
+        } else {
+            "ipv6".to_owned()
+        };
+
         builder
             .event_type(ClickhouseEventRecordType::Session)
             .parent(event.parent)
             .add_attr("user_agent".to_owned(), event.user_agent.to_owned())
+            .add_attr(ip_key, event.ip.to_string())
             .try_build()
     }
 }
@@ -207,6 +214,8 @@ impl ClickhouseEventRecordBuilder {
 
 #[cfg(test)]
 mod tests {
+    use std::net::{IpAddr, Ipv4Addr};
+
     use crate::domain::model::ingest_event::{ApiKey, Site};
 
     use super::*;
@@ -243,6 +252,7 @@ mod tests {
     #[test]
     fn test_try_from_ingest_event() {
         let uuid_visitor = Uuid::now_v7();
+        let client_ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
         let Ok(valid_visitor_event) = VisitorEvent::try_new(
             ApiKey::new("abc-124"),
             Site::new("http://salusmetrics.com"),
@@ -263,6 +273,7 @@ mod tests {
             uuid_visitor,
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0"
                 .to_owned(),
+            client_ip,
         ) else {
             panic!("Expected valid SessionEvent to be created");
         };

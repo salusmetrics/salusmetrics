@@ -1,3 +1,5 @@
+use std::net::IpAddr;
+
 use axum::response::IntoResponse;
 use http::StatusCode;
 use serde_repr::Deserialize_repr;
@@ -90,6 +92,7 @@ impl IntoResponse for ClientEventRequestError {
 pub struct ClientEventRequest {
     pub headers: ClientEventRequestHeaders,
     pub body: ClientEventRequestBody,
+    pub ip: IpAddr,
 }
 
 impl ClientEventRequest {
@@ -159,6 +162,7 @@ impl TryFrom<&ClientEventRequest> for SessionEvent {
             value.body.id,
             parent_uuid,
             value.headers.user_agent.to_owned(),
+            value.ip,
         )
         .map_err(|e| e.into())
     }
@@ -219,7 +223,7 @@ impl TryFrom<&ClientEventRequest> for ClickEvent {
 #[cfg(test)]
 mod tests {
 
-    use std::collections::HashMap;
+    use std::{collections::HashMap, net::Ipv4Addr};
 
     use super::*;
     use crate::domain::model::ingest_event::CommonEvent;
@@ -262,6 +266,7 @@ mod tests {
     fn test_try_from_client_request() {
         let uuid_now = Uuid::now_v7();
         let parent_id = Uuid::now_v7();
+        let client_ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
 
         // Visitor
         let valid_visitor_request = ClientEventRequest {
@@ -275,6 +280,7 @@ mod tests {
                 site: SITE.to_owned(),
                 user_agent: USER_AGENT.to_owned(),
             },
+            ip: client_ip,
         };
         let visitor_ingest_event: IngestEvent = (&valid_visitor_request).try_into().unwrap();
         match visitor_ingest_event {
@@ -300,6 +306,7 @@ mod tests {
                 site: SITE.to_owned(),
                 user_agent: USER_AGENT.to_owned(),
             },
+            ip: client_ip,
         };
         let session_ingest_event: IngestEvent = (&valid_session_request).try_into().unwrap();
         match session_ingest_event {
@@ -326,6 +333,7 @@ mod tests {
                 site: SITE.to_owned(),
                 user_agent: USER_AGENT.to_owned(),
             },
+            ip: client_ip,
         };
         let section_ingest_event: IngestEvent = (&valid_section_request).try_into().unwrap();
         match section_ingest_event {
@@ -352,6 +360,7 @@ mod tests {
                 site: SITE.to_owned(),
                 user_agent: USER_AGENT.to_owned(),
             },
+            ip: client_ip,
         };
         let click_ingest_event: IngestEvent = (&valid_click_request).try_into().unwrap();
         match click_ingest_event {

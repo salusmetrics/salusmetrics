@@ -1,3 +1,5 @@
+use std::net::IpAddr;
+
 use thiserror::Error;
 use time::OffsetDateTime;
 use uuid::Uuid;
@@ -181,6 +183,8 @@ pub struct SessionEvent {
     pub parent: Uuid,
     /// `user_agent` records the user agent/system on which the event originated
     pub user_agent: String,
+    /// `ip` records the ip address that this event originated from
+    pub ip: IpAddr,
 }
 
 impl CommonEvent for &SessionEvent {
@@ -206,11 +210,13 @@ impl SessionEvent {
         id: Uuid,
         parent: Uuid,
         user_agent: String,
+        ip: IpAddr,
     ) -> Result<Self, IngestEventError> {
         Self::try_new_with_core_event(
             IngestEventCore::try_new(api_key, site, id)?,
             parent,
             user_agent,
+            ip,
         )
     }
 
@@ -220,6 +226,7 @@ impl SessionEvent {
         core: IngestEventCore,
         parent: Uuid,
         user_agent: String,
+        ip: IpAddr,
     ) -> Result<Self, IngestEventError> {
         Ok(Self {
             api_key: core.api_key,
@@ -228,6 +235,7 @@ impl SessionEvent {
             ts: core.ts,
             parent,
             user_agent,
+            ip,
         })
     }
 }
@@ -427,6 +435,8 @@ impl IngestEventCore {
 
 #[cfg(test)]
 mod tests {
+    use std::net::Ipv4Addr;
+
     use uuid::{Timestamp, Uuid};
 
     use super::*;
@@ -466,6 +476,7 @@ mod tests {
     fn test_try_new_events() {
         let uuid_now = Uuid::now_v7();
         let (ts_now, _) = uuid_now.get_timestamp().unwrap().to_unix();
+        let client_ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
         let test_core: Result<IngestEventCore, IngestEventError> =
             IngestEventCore::try_new(ApiKey::new(API_KEY_STR), Site::new(SITE), uuid_now);
         let Ok(_) = test_core else {
@@ -518,6 +529,7 @@ mod tests {
             Uuid::now_v7(),
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:135.0) Gecko/20100101 Firefox/135.0"
                 .to_owned(),
+            client_ip,
         ) else {
             panic!("Expected valid SessionEvent");
         };

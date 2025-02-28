@@ -1,7 +1,7 @@
 use axum::{Router, routing::post};
 use conf::domain::service::configuration_service::ConfigurationService;
 use http::Method;
-use std::error::Error;
+use std::{error::Error, net::SocketAddr};
 use tower_http::{cors::Any, trace::TraceLayer};
 
 use crate::{
@@ -57,10 +57,13 @@ where
         let listener = tokio::net::TcpListener::bind(listener_socket_addr).await?;
         tracing::debug!("listening on {}", listener.local_addr().unwrap());
 
-        axum::serve(listener, app)
-            .with_graceful_shutdown(conf::lifecycle::terminate_signal())
-            .await
-            .unwrap();
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<SocketAddr>(),
+        )
+        .with_graceful_shutdown(conf::lifecycle::terminate_signal())
+        .await
+        .unwrap();
         Ok(())
     }
 }

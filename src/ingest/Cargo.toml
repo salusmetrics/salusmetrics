@@ -9,6 +9,7 @@ license.workspace = true
 clickhouse = { workspace = true, features = ["time", "uuid"] }
 conf.workspace = true
 axum.workspace = true
+axum-client-ip.workspace = true
 http.workspace = true
 hyper.workspace = true
 serde.workspace = true

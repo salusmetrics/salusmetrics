@@ -7,6 +7,8 @@ CREATE TABLE SALUS_METRICS.SESSION_EVENT (
     `ts` DateTime CODEC(Delta(4), ZSTD(1)),
     `parent` UUID ALIAS attrs['parent'],
     `user_agent` String ALIAS attrs['user_agent'],
+    `ipv4` Nullable(IPv4) ALIAS attrs['ipv4'],
+    `ipv6` Nullable(IPv6) ALIAS attrs['ipv6'],
     `attrs` Map (LowCardinality (String), String) CODEC (ZSTD (1))
 ) ENGINE = MergeTree
 ORDER BY
