@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS SALUS_METRICS.VISITOR_EVENT;
+
 CREATE TABLE SALUS_METRICS.VISITOR_EVENT (
     `api_key` LowCardinality (String) CODEC (ZSTD (1)),
     `site` LowCardinality (String) CODEC (ZSTD (1)),
@@ -6,7 +8,9 @@ CREATE TABLE SALUS_METRICS.VISITOR_EVENT (
     `attrs` Map (LowCardinality (String), String) CODEC (ZSTD (1))
 ) ENGINE = MergeTree
 ORDER BY
-    (api_key, site, ts);
+    (api_key, site, id);
+
+DROP TABLE IF EXISTS SALUS_METRICS.visitor_event_mv;
 
 CREATE MATERIALIZED VIEW SALUS_METRICS.visitor_event_mv TO SALUS_METRICS.VISITOR_EVENT AS
 SELECT
@@ -24,6 +28,8 @@ WHERE
         (api_key, site)
     ) = 1;
 
+DROP TABLE IF EXISTS SALUS_METRICS.VISITOR_TIMESERIES;
+
 CREATE TABLE SALUS_METRICS.VISITOR_TIMESERIES (
     `api_key` LowCardinality (String) CODEC (ZSTD (1)),
     `site` LowCardinality (String) CODEC (ZSTD (1)),
@@ -32,6 +38,8 @@ CREATE TABLE SALUS_METRICS.VISITOR_TIMESERIES (
 ) ENGINE = SummingMergeTree
 ORDER BY
     (api_key, site, ts_bin);
+
+DROP TABLE IF EXISTS SALUS_METRICS.visitor_timeseries_mv;
 
 CREATE MATERIALIZED VIEW SALUS_METRICS.visitor_timeseries_mv TO SALUS_METRICS.VISITOR_TIMESERIES AS
 SELECT
@@ -44,4 +52,4 @@ FROM
 GROUP BY
     api_key,
     site,
-    ts_bin
+    ts_bin;

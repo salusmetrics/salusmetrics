@@ -1,3 +1,5 @@
+DROP TABLE IF EXISTS SALUS_METRICS.SECTION_EVENT;
+
 CREATE TABLE SALUS_METRICS.SECTION_EVENT (
     `api_key` LowCardinality (String) CODEC (ZSTD (1)),
     `site` LowCardinality (String) CODEC (ZSTD (1)),
@@ -11,8 +13,11 @@ CREATE TABLE SALUS_METRICS.SECTION_EVENT (
     `attrs` Map (LowCardinality (String), String) CODEC (ZSTD (1))
 ) ENGINE = MergeTree
 ORDER BY
-    (api_key, site, path, ts)
+    (api_key, site, path, id)
 TTL ts + INTERVAL 1 WEEK;
+
+
+DROP TABLE IF EXISTS SALUS_METRICS.section_event_mv;
 
 CREATE MATERIALIZED VIEW SALUS_METRICS.section_event_mv TO SALUS_METRICS.SECTION_EVENT AS
 SELECT
@@ -34,6 +39,8 @@ WHERE
 
 
 
+DROP TABLE IF EXISTS SALUS_METRICS.SECTION_TIMESERIES;
+
 CREATE TABLE SALUS_METRICS.SECTION_TIMESERIES (
     `api_key` LowCardinality (String) CODEC (ZSTD (1)),
     `site` LowCardinality (String) CODEC (ZSTD (1)),
@@ -43,6 +50,9 @@ CREATE TABLE SALUS_METRICS.SECTION_TIMESERIES (
 ) ENGINE = SummingMergeTree
 ORDER BY
     (api_key, site, path, ts_bin);
+
+
+DROP TABLE IF EXISTS SALUS_METRICS.section_timeseries_mv;
 
 CREATE MATERIALIZED VIEW SALUS_METRICS.section_timeseries_mv TO SALUS_METRICS.SECTION_TIMESERIES AS
 SELECT

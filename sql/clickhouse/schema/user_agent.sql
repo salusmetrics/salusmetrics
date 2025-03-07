@@ -34,32 +34,32 @@ create dictionary SALUS_METRICS.regexp_device (
 ) LIFETIME (0) LAYOUT (regexp_tree);
 
 select
-    user_agent,
+    -- user_agent,
+    tupleElement (device_tuple, 1) as device_brand,
+    tupleElement (device_tuple, 2) as device_model,
+    tupleElement (os_tuple, 1) as os_name,
     concat (
-        tupleElement (device, 1),
-        ' ',
-        tupleElement (device, 2)
-    ) as device,
+        tupleElement (os_tuple, 2),
+        '.',
+        tupleElement (os_tuple, 3),
+        '.',
+        tupleElement (os_tuple, 4)
+    ) as os_version,
+    tupleElement (browser_tuple, 1) as browser_name,
     concat (
-        tupleElement (browser, 1),
-        ' ',
-        tupleElement (browser, 2),
+        tupleElement (browser_tuple, 2),
         '.',
-        tupleElement (browser, 3)
-    ) as browser,
-    concat (
-        tupleElement (os, 1),
-        ' ',
-        tupleElement (os, 2),
-        '.',
-        tupleElement (os, 3),
-        '.',
-        tupleElement (os, 4)
-    ) as os
+        tupleElement (browser_tuple, 3)
+    ) as browser_version
 from
     (
         select
             user_agent,
+            dictGet (
+                'SALUS_METRICS.regexp_device',
+                ('brand_replacement', 'device_replacement'),
+                user_agent
+            ) device_tuple,
             dictGet (
                 'SALUS_METRICS.regexp_os',
                 (
@@ -69,7 +69,7 @@ from
                     'os_v3_replacement'
                 ),
                 user_agent
-            ) os,
+            ) os_tuple,
             dictGet (
                 'SALUS_METRICS.regexp_browser',
                 (
@@ -78,14 +78,11 @@ from
                     'v2_replacement'
                 ),
                 user_agent
-            ) as browser,
-            dictGet (
-                'SALUS_METRICS.regexp_device',
-                ('brand_replacement', 'device_replacement'),
-                user_agent
-            ) device
+            ) as browser_tuple
         from
             SALUS_METRICS.SESSION_EVENT
     )
 order by
-    user_agent;
+    user_agent
+limit
+    20;
