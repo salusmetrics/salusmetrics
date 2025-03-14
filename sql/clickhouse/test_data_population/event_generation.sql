@@ -25,7 +25,7 @@
 
 
 
-set param_BASE = 10;
+set param_BASE = 5000;
 select {BASE:UInt16} as base_val;
 
 -------------------------------------------------------------------------------
@@ -205,8 +205,8 @@ attr AS (
 INSERT INTO SALUS_METRICS.EVENT
 SELECT api_key, site, 'Session', generateUUIDv7(rv) as id, visitor_ts as ts,
   map('parent', toString(visitor_id), 'user_agent', user_agent, 'ipv4', IPv4NumToString(ipv4)) as attrs
-FROM visitors
-INNER JOIN attr ON attr.ra = visitors.rv;
+FROM attr
+INNER JOIN visitors ON attr.ra = visitors.rv;
 
 -- **** Insert randomly distributed records that are bounded by the parent ts ****
 WITH visitors AS (
@@ -333,8 +333,8 @@ attr AS (
 INSERT INTO SALUS_METRICS.EVENT
 SELECT api_key, site, 'Session', generateUUIDv7(rv) as id, (now() - toIntervalSecond(randUniform(0, 31536000) % diff)) as ts,
   map('parent', toString(visitor_id), 'user_agent', user_agent, 'ipv4', IPv4NumToString(ipv4)) as attrs
-FROM visitors
-INNER JOIN attr ON attr.ra = visitors.rv;
+FROM attr
+INNER JOIN visitors ON attr.ra = visitors.rv;
 
 
 
@@ -353,7 +353,7 @@ attr AS (
   FROM (
     SELECT *
     FROM generateRandom(
-      'path1 Enum8(''/'', ''/world-maps/'', ''/asia/'', ''/africa/'', ''/antarctica/'', ''/oceania/'', ''/northamerica/'', ''/southamerica/'', ''/mars/''),
+      'path1 Enum8(''/'', ''/world-maps/'', ''/asia/'', ''/africa/'', ''/oceania/'', ''/northamerica/'', ''/southamerica/'', ''/europe/''),
       path2 Enum8('''', ''country1/'', ''country2/'', ''country3/'', ''country4/'', ''country5/'', ''country6/'', ''country7/'', ''country8/'', ''country9/''),
       resource Enum8('''', ''type1'', ''type2'', ''type3'', ''type4'', ''type5'', ''type6'', ''type7''),
       title String')
@@ -363,26 +363,26 @@ attr AS (
 INSERT INTO SALUS_METRICS.EVENT
 SELECT api_key, site, 'Section', generateUUIDv7(rv) as id, session_ts as ts,
   map('parent', toString(session_id), 'location', 'https://salusmetrics.com' || path1 || path2 || resource, 'title', title) as attrs
-FROM sessions
-INNER JOIN attr ON attr.ra = sessions.rv;
+FROM attr
+INNER JOIN sessions ON attr.ra = sessions.rv;
 
 -- **** Insert randomly distributed records that are bounded by the parent ts ****
 WITH sessions AS (
-  SELECT api_key, site, id as session_id, ts as session_ts, (now() - ts) as diff, row_number() OVER (ORDER BY id) as rv
+  SELECT api_key, site, id as session_id, ts as session_ts, row_number() OVER (ORDER BY id) as rv
   FROM SALUS_METRICS.SESSION_EVENT
 ),
 attr AS (
   SELECT *,
   toUInt64(
       floor(
-          randNormal(
-              (SELECT count(*) FROM sessions) / 2,
-              (SELECT count(*) FROM sessions) / 3))
-      ) % (SELECT count(*) FROM sessions) + 1 as ra
+          randUniform(
+              0,
+              (SELECT count(*) FROM sessions)))
+      ) + 1 as ra
   FROM (
     SELECT *
     FROM generateRandom(
-      'path1 Enum8(''/'', ''/world-maps/'', ''/asia/'', ''/africa/'', ''/antarctica/'', ''/oceania/'', ''/northamerica/'', ''/southamerica/'', ''/mars/''),
+      'path1 Enum8(''/'', ''/world-maps/'', ''/asia/'', ''/africa/'', ''/oceania/'', ''/northamerica/'', ''/southamerica/'', ''/europe/''),
       path2 Enum8('''', ''country1/'', ''country2/'', ''country3/'', ''country4/'', ''country5/'', ''country6/'', ''country7/'', ''country8/'', ''country9/''),
       resource Enum8('''', ''type1'', ''type2'', ''type3'', ''type4'', ''type5'', ''type6'', ''type7''),
       title String')
@@ -392,5 +392,5 @@ attr AS (
 INSERT INTO SALUS_METRICS.EVENT
 SELECT api_key, site, 'Section', generateUUIDv7(rv) as id, (session_ts + toIntervalSecond(randUniform(0, 3600))) as ts,
     map('parent', toString(session_id), 'location', 'https://salusmetrics.com' || path1 || path2 || resource, 'title', title) as attrs
-FROM sessions
-INNER JOIN attr ON attr.ra = sessions.rv;
+FROM attr
+INNER JOIN sessions ON attr.ra = sessions.rv;

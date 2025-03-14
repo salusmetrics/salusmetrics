@@ -15,11 +15,9 @@ CREATE TABLE SALUS_METRICS.SESSION_EVENT (
     `user_agent` String ALIAS attrs['user_agent'],
     `ipv4` Nullable(IPv4) ALIAS attrs['ipv4'],
     `ipv6` Nullable(IPv6) ALIAS attrs['ipv6'],
-    `country_code` Nullable(String),
-    `state` Nullable(String),
-    `city` Nullable(String),
-    `latitude` Nullable(Float64),
-    `longitude` Nullable(Float64),
+    `country_code` String,
+    `state` String,
+    `city` String,
     `attrs` Map (LowCardinality (String), String) CODEC (ZSTD (1))
 ) ENGINE = MergeTree
 ORDER BY
@@ -51,11 +49,9 @@ SELECT
         '.',
         tupleElement (browser_tuple, 3)
     ) as browser_version,
-    tupleElement (loc_tuple, 1) as country_code,
-    tupleElement (loc_tuple, 2) as state,
-    tupleElement (loc_tuple, 3) as city,
-    tupleElement (loc_tuple, 4) as latitude,
-    tupleElement (loc_tuple, 5) as longitude
+    COALESCE(tupleElement (loc_tuple, 1), 'unknown') as country_code,
+    COALESCE(tupleElement (loc_tuple, 2), 'unknown') as state,
+    COALESCE(tupleElement (loc_tuple, 3), 'unknown') as city
 FROM (
     SELECT
         api_key,
