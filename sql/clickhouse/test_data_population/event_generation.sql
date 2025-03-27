@@ -23,24 +23,238 @@
 --   'localhost',
 --   'Salus Metrics LLC - Local Development')
 
+TRUNCATE TABLE SALUS_METRICS.VISITOR_EVENT;
+-- TRUNCATE TABLE SALUS_METRICS.VISITOR_TIMESERIES;
+TRUNCATE TABLE SALUS_METRICS.SESSION_EVENT;
+-- TRUNCATE TABLE SALUS_METRICS.SESSION_TIMESERIES;
+TRUNCATE TABLE SALUS_METRICS.SECTION_EVENT;
+-- TRUNCATE TABLE SALUS_METRICS.SECTION_TIMESERIES;
+TRUNCATE TABLE SALUS_METRICS.SECTION_COMBINED;
+
+-- insert into EVENT select * from (select api_key, site, 'Session' as event_type, generateUUIDv7() as id, now() as ts, attrs from SESSION_EVENT limit 1)
+-- insert into EVENT select * from (select api_key, site, 'Section' as event_type, generateUUIDv7() as id, now() as ts, attrs from SECTION_EVENT limit 1)
 
 
-set param_BASE = 5000;
+set param_BASE = 10000;
 select {BASE:UInt16} as base_val;
+
+-- Set up intermediary tables
+-- Want to use asynchronous insert to get best use of resources.
+-- Also use query cache for best performance SETTINGS use_query_cache = true
+
+DROP TABLE IF EXISTS SALUS_METRICS.path_synth;
+
+CREATE TABLE SALUS_METRICS.path_synth (
+    `rv` UInt16,
+    `path1` String,
+    `path2` String,
+    `resource` String,
+    `title` String
+) ENGINE = MergeTree
+ORDER BY (rv);
+
+INSERT INTO SALUS_METRICS.path_synth
+SELECT (row_number() OVER ()) - 1 as rv, path1, path2, resource, concat(path1, path2, resource, ' - Title') AS Title
+FROM (
+  SELECT arrayJoin(['/', '/dir1/', '/dir2/', '/dir3/', '/dir4/', '/dir5/'] AS src) AS path1
+) AS t1
+CROSS JOIN (
+  SELECT arrayJoin(['', 'subdir1/', 'subdir2/', 'subdir3/', 'subdir4/', 'subdir5/'] AS src) AS path2
+) AS t2
+CROSS JOIN (
+  SELECT arrayJoin(['', 'type1', 'type2', 'type3', 'type4', 'type5'] AS src) AS resource
+) AS t3;
+
+
+DROP TABLE IF EXISTS SALUS_METRICS.EVENT_synth;
+
+CREATE TABLE SALUS_METRICS.EVENT_synth (
+    `api_key` LowCardinality (String),
+    `site` LowCardinality (String),
+    `event_type` Enum8 (
+        'Visitor' = 1,
+        'Session' = 2,
+        'Section' = 3,
+        'Click' = 4
+    ),
+    `id` UUID,
+    `ts` DateTime DEFAULT UUIDv7ToDateTime (id),
+    `attrs` Map (LowCardinality (String), String),
+) ENGINE = Null;
+
+DROP TABLE IF EXISTS SALUS_METRICS.VISITOR_EVENT_synth;
+CREATE TABLE SALUS_METRICS.VISITOR_EVENT_synth (
+    `api_key` LowCardinality (String) CODEC (ZSTD (1)),
+    `site` LowCardinality (String) CODEC (ZSTD (1)),
+    `id` UUID CODEC (ZSTD (1)),
+    `ts` DateTime CODEC (Delta (4), ZSTD (1)),
+    `attrs` Map (LowCardinality (String), String) CODEC (ZSTD (1))
+) ENGINE = MergeTree
+ORDER BY
+    (api_key, site, id);
+
+DROP TABLE IF EXISTS SALUS_METRICS.visitor_event_mv_synth;
+CREATE MATERIALIZED VIEW SALUS_METRICS.visitor_event_mv_synth TO SALUS_METRICS.VISITOR_EVENT_synth AS
+SELECT
+    api_key,
+    site,
+    id,
+    ts,
+    attrs
+FROM
+    SALUS_METRICS.EVENT_synth
+WHERE
+    event_type = 'Visitor'
+    AND dictHas (
+        'SALUS_METRICS.api_key_dictionary',
+        (api_key, site)
+    ) = 1;
+
+DROP TABLE IF EXISTS SALUS_METRICS.SESSION_EVENT_synth;
+CREATE TABLE SALUS_METRICS.SESSION_EVENT_synth (
+    `api_key` LowCardinality (String) CODEC (ZSTD (1)),
+    `site` LowCardinality (String) CODEC (ZSTD (1)),
+    `id` UUID CODEC (ZSTD (1)),
+    `ts` DateTime CODEC(Delta(4), ZSTD(1)),
+    `parent` UUID ALIAS attrs['parent'],
+    `device_brand` String DEFAULT 'unknown',
+    `device_model` String DEFAULT 'unknown',
+    `os` String DEFAULT 'unknown',
+    `os_version` String DEFAULT 'unknown',
+    `browser` String DEFAULT 'unknown',
+    `browser_version` String DEFAULT 'unknown',
+    `user_agent` String ALIAS attrs['user_agent'],
+    `ipv4` Nullable(IPv4) ALIAS attrs['ipv4'],
+    `ipv6` Nullable(IPv6) ALIAS attrs['ipv6'],
+    `country_code` String,
+    `state` String,
+    `city` String,
+    `attrs` Map (LowCardinality (String), String) CODEC (ZSTD (1))
+) ENGINE = MergeTree
+ORDER BY
+    (api_key, site, id);
+
+DROP TABLE IF EXISTS SALUS_METRICS.session_event_mv_synth;
+CREATE MATERIALIZED VIEW SALUS_METRICS.session_event_mv_synth TO SALUS_METRICS.SESSION_EVENT_synth AS
+SELECT
+    api_key,
+    site,
+    id,
+    ts,
+    attrs,
+    tupleElement (device_tuple, 1) as device_brand,
+    tupleElement (device_tuple, 2) as device_model,
+    tupleElement (os_tuple, 1) as os,
+    concat (
+        tupleElement (os_tuple, 2),
+        '.',
+        tupleElement (os_tuple, 3),
+        '.',
+        tupleElement (os_tuple, 4)
+    ) as os_version,
+    tupleElement (browser_tuple, 1) as browser,
+    concat (
+        tupleElement (browser_tuple, 2),
+        '.',
+        tupleElement (browser_tuple, 3)
+    ) as browser_version,
+    COALESCE(tupleElement (loc_tuple, 1), 'unknown') as country_code,
+    COALESCE(tupleElement (loc_tuple, 2), 'unknown') as state,
+    COALESCE(tupleElement (loc_tuple, 3), 'unknown') as city
+FROM (
+    SELECT
+        api_key,
+        site,
+        id,
+        ts,
+        attrs,
+        attrs['user_agent'] as user_agent,
+        dictGet (
+            'SALUS_METRICS.regexp_device',
+            ('brand_replacement', 'device_replacement'),
+            user_agent
+        ) device_tuple,
+        dictGet (
+            'SALUS_METRICS.regexp_os',
+            (
+                'os_replacement',
+                'os_v1_replacement',
+                'os_v2_replacement',
+                'os_v3_replacement'
+            ),
+            user_agent
+        ) os_tuple,
+        dictGet (
+            'SALUS_METRICS.regexp_browser',
+            (
+                'family_replacement',
+                'v1_replacement',
+                'v2_replacement'
+            ),
+            user_agent
+        ) as browser_tuple,
+        attrs['ipv4'] as ipv4,
+        dictGetOrNull('SALUS_METRICS.dbip_city_ipv4_trie',
+            ('country_code', 'state', 'city', 'latitude', 'longitude'), coalesce(toIPv4(ipv4), toIPv4(0))) as loc_tuple
+    FROM SALUS_METRICS.EVENT_synth
+    WHERE
+        event_type = 'Session'
+        AND dictHas (
+            'SALUS_METRICS.api_key_dictionary',
+            (api_key, site)
+        ) = 1
+        AND attrs['parent'] > ''
+);
+
+DROP TABLE IF EXISTS SALUS_METRICS.SECTION_EVENT_synth;
+CREATE TABLE SALUS_METRICS.SECTION_EVENT_synth (
+    `api_key` LowCardinality (String) CODEC (ZSTD (1)),
+    `site` LowCardinality (String) CODEC (ZSTD (1)),
+    `path` String CODEC (ZSTD (1)),
+    `query` String ALIAS queryString(attrs['location']),
+    `fragment` String ALIAS fragment(attrs['location']),
+    `title` String ALIAS attrs['title'],
+    `id` UUID CODEC (ZSTD (1)),
+    `ts` DateTime CODEC(Delta(4), ZSTD(1)),
+    `parent` UUID CODEC(ZSTD(1)),
+    `attrs` Map (LowCardinality (String), String) CODEC (ZSTD (1))
+) ENGINE = MergeTree
+ORDER BY
+    (api_key, site, parent, id)
+-- TTL ts + INTERVAL 1 WEEK
+;
+
+DROP TABLE IF EXISTS SALUS_METRICS.section_event_mv_synth;
+CREATE MATERIALIZED VIEW SALUS_METRICS.section_event_mv_synth TO SALUS_METRICS.SECTION_EVENT_synth AS
+SELECT
+    api_key,
+    site,
+    path(attrs['location']) as path,
+    id,
+    ts,
+    toUUID(attrs['parent']) as parent,
+    attrs
+FROM
+    SALUS_METRICS.EVENT_synth
+WHERE
+    event_type = 'Section'
+    AND dictHas (
+        'SALUS_METRICS.api_key_dictionary',
+        (api_key, site)
+    ) = 1
+    AND attrs['parent'] > '';
+
 
 -------------------------------------------------------------------------------
 -- Visitor Event Random Data Population
 -------------------------------------------------------------------------------
--- TRUNCATE TABLE SALUS_METRICS.EVENT;
-TRUNCATE TABLE SALUS_METRICS.VISITOR_EVENT;
-TRUNCATE TABLE SALUS_METRICS.VISITOR_TIMESERIES;
 -- **** Start with uniform distribution over the past year ****
 WITH apikeys AS (
   SELECT api_key, site
   FROM SALUS_METRICS.API_KEY
   WHERE site = 'salusmetrics.com'
 )
-INSERT INTO SALUS_METRICS.EVENT
+INSERT INTO SALUS_METRICS.EVENT_synth
 SELECT api_key, site, 'Visitor',
     generateUUIDv7(n.number),
     (now() - toIntervalMinute(randUniform(0, 60 * 24))) - toIntervalDay(randUniform(0, 365)) AS ts,
@@ -54,7 +268,7 @@ WITH apikeys AS (
   FROM SALUS_METRICS.API_KEY
   WHERE site = 'salusmetrics.com'
 )
-INSERT INTO SALUS_METRICS.EVENT
+INSERT INTO SALUS_METRICS.EVENT_synth
 SELECT *
 FROM
 (
@@ -84,12 +298,10 @@ FROM
 -------------------------------------------------------------------------------
 -- Session Event Random Data Population
 -------------------------------------------------------------------------------
-TRUNCATE TABLE SALUS_METRICS.SESSION_EVENT;
-TRUNCATE TABLE SALUS_METRICS.SESSION_TIMESERIES;
 -- **** Insert records for each child with the same ts as the parent for all types ****
 WITH visitors AS (
-  SELECT api_key, site, id as visitor_id, ts as visitor_ts, row_number() OVER (ORDER BY id) as rv
-  FROM SALUS_METRICS.VISITOR_EVENT
+  SELECT api_key, site, id as visitor_id, ts as visitor_ts, row_number() OVER () as rv
+  FROM SALUS_METRICS.VISITOR_EVENT_synth
 ),
 attr AS (
   SELECT user_agent, ipv4, row_number() OVER() as ra
@@ -202,16 +414,18 @@ attr AS (
     LIMIT (SELECT COUNT(*) FROM visitors)
   )
 )
-INSERT INTO SALUS_METRICS.EVENT
+INSERT INTO SALUS_METRICS.EVENT_synth
 SELECT api_key, site, 'Session', generateUUIDv7(rv) as id, visitor_ts as ts,
   map('parent', toString(visitor_id), 'user_agent', user_agent, 'ipv4', IPv4NumToString(ipv4)) as attrs
 FROM attr
-INNER JOIN visitors ON attr.ra = visitors.rv;
+INNER JOIN visitors ON attr.ra = visitors.rv
+SETTINGS join_algorithm = 'full_sorting_merge'
+;
 
 -- **** Insert randomly distributed records that are bounded by the parent ts ****
 WITH visitors AS (
-  SELECT api_key, site, id as visitor_id, ts as visitor_ts, (now() - ts) as diff, row_number() OVER (ORDER BY id) as rv
-  FROM SALUS_METRICS.VISITOR_EVENT
+  SELECT api_key, site, id as visitor_id, ts as visitor_ts, (now() - ts) as diff, row_number() OVER () as rv
+  FROM SALUS_METRICS.VISITOR_EVENT_synth
 ),
 attr AS (
   SELECT user_agent, ipv4,
@@ -330,46 +544,45 @@ attr AS (
     LIMIT (SELECT count(*) * 9 FROM visitors)
   )
 )
-INSERT INTO SALUS_METRICS.EVENT
+INSERT INTO SALUS_METRICS.EVENT_synth
 SELECT api_key, site, 'Session', generateUUIDv7(rv) as id, (now() - toIntervalSecond(randUniform(0, 31536000) % diff)) as ts,
   map('parent', toString(visitor_id), 'user_agent', user_agent, 'ipv4', IPv4NumToString(ipv4)) as attrs
 FROM attr
-INNER JOIN visitors ON attr.ra = visitors.rv;
+INNER JOIN visitors ON attr.ra = visitors.rv
+SETTINGS join_algorithm = 'full_sorting_merge'
+;
 
 
 
 -------------------------------------------------------------------------------
 -- Section Event Random Data Population
 -------------------------------------------------------------------------------
-TRUNCATE TABLE SALUS_METRICS.SECTION_EVENT;
-TRUNCATE TABLE SALUS_METRICS.SECTION_TIMESERIES;
 -- **** Insert records for each child with the same ts as the parent for all types ****
 WITH sessions AS (
-  SELECT api_key, site, id as session_id, ts as session_ts, row_number() OVER (ORDER BY id) as rv
-  FROM SALUS_METRICS.SESSION_EVENT
+  SELECT api_key, site, id as session_id, ts as session_ts, row_number() OVER() as rv
+  FROM SALUS_METRICS.SESSION_EVENT_synth
 ),
 attr AS (
-  SELECT *, row_number() OVER() as ra
-  FROM (
-    SELECT *
-    FROM generateRandom(
-      'path1 Enum8(''/'', ''/world-maps/'', ''/asia/'', ''/africa/'', ''/oceania/'', ''/northamerica/'', ''/southamerica/'', ''/europe/''),
-      path2 Enum8('''', ''country1/'', ''country2/'', ''country3/'', ''country4/'', ''country5/'', ''country6/'', ''country7/'', ''country8/'', ''country9/''),
-      resource Enum8('''', ''type1'', ''type2'', ''type3'', ''type4'', ''type5'', ''type6'', ''type7''),
-      title String')
-    LIMIT (select count(*) from sessions)
-  )
+    SELECT *, row_number() OVER() as ra
+    FROM (
+        SELECT floor(abs(randNormal(0, 70))) % (SELECT count(*) FROM SALUS_METRICS.path_synth) AS path_id
+        FROM sessions
+    ) as rands
+    INNER JOIN SALUS_METRICS.path_synth
+    ON SALUS_METRICS.path_synth.rv = rands.path_id
 )
-INSERT INTO SALUS_METRICS.EVENT
+INSERT INTO SALUS_METRICS.EVENT_synth
 SELECT api_key, site, 'Section', generateUUIDv7(rv) as id, session_ts as ts,
   map('parent', toString(session_id), 'location', 'https://salusmetrics.com' || path1 || path2 || resource, 'title', title) as attrs
 FROM attr
-INNER JOIN sessions ON attr.ra = sessions.rv;
+INNER JOIN sessions ON attr.ra = sessions.rv
+SETTINGS join_algorithm = 'full_sorting_merge'
+;
 
 -- **** Insert randomly distributed records that are bounded by the parent ts ****
 WITH sessions AS (
   SELECT api_key, site, id as session_id, ts as session_ts, row_number() OVER (ORDER BY id) as rv
-  FROM SALUS_METRICS.SESSION_EVENT
+  FROM SALUS_METRICS.SESSION_EVENT_synth
 ),
 attr AS (
   SELECT *,
@@ -381,16 +594,33 @@ attr AS (
       ) + 1 as ra
   FROM (
     SELECT *
-    FROM generateRandom(
-      'path1 Enum8(''/'', ''/world-maps/'', ''/asia/'', ''/africa/'', ''/oceania/'', ''/northamerica/'', ''/southamerica/'', ''/europe/''),
-      path2 Enum8('''', ''country1/'', ''country2/'', ''country3/'', ''country4/'', ''country5/'', ''country6/'', ''country7/'', ''country8/'', ''country9/''),
-      resource Enum8('''', ''type1'', ''type2'', ''type3'', ''type4'', ''type5'', ''type6'', ''type7''),
-      title String')
-    LIMIT ((SELECT count(*) FROM sessions) * 9)
+    FROM (
+        SELECT floor(abs(randNormal(0, 70))) % (SELECT count(*) FROM SALUS_METRICS.path_synth) AS path_id
+        FROM sessions
+        CROSS JOIN numbers(9) as mult
+    ) as rands
+    INNER JOIN SALUS_METRICS.path_synth
+    ON SALUS_METRICS.path_synth.rv = rands.path_id
   )
 )
-INSERT INTO SALUS_METRICS.EVENT
+INSERT INTO SALUS_METRICS.EVENT_synth
 SELECT api_key, site, 'Section', generateUUIDv7(rv) as id, (session_ts + toIntervalSecond(randUniform(0, 3600))) as ts,
     map('parent', toString(session_id), 'location', 'https://salusmetrics.com' || path1 || path2 || resource, 'title', title) as attrs
 FROM attr
-INNER JOIN sessions ON attr.ra = sessions.rv;
+INNER JOIN sessions ON attr.ra = sessions.rv
+SETTINGS join_algorithm = 'full_sorting_merge'
+;
+
+INSERT INTO SALUS_METRICS.VISITOR_EVENT
+SELECT * FROM SALUS_METRICS.VISITOR_EVENT_synth;
+DROP TABLE IF EXISTS SALUS_METRICS.VISITOR_EVENT_synth;
+
+INSERT INTO SALUS_METRICS.SESSION_EVENT
+SELECT * FROM SALUS_METRICS.SESSION_EVENT_synth;
+DROP TABLE IF EXISTS SALUS_METRICS.SESSION_EVENT_synth;
+
+INSERT INTO SALUS_METRICS.SECTION_EVENT
+SELECT * FROM SALUS_METRICS.SECTION_EVENT_synth;
+DROP TABLE IF EXISTS SALUS_METRICS.SECTION_EVENT_synth;
+
+DROP TABLE IF EXISTS SALUS_METRICS.path_synth;

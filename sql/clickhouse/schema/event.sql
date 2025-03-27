@@ -1,5 +1,7 @@
 -- Want to use asynchronous insert to get best use of resources.
 -- Also use query cache for best performance SETTINGS use_query_cache = true
+DROP TABLE IF EXISTS SALUS_METRICS.EVENT;
+
 CREATE TABLE SALUS_METRICS.EVENT (
     `api_key` LowCardinality (String),
     `site` LowCardinality (String),

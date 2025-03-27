@@ -95,32 +95,50 @@ FROM (
             (api_key, site)
         ) = 1
         AND attrs['parent'] > ''
-);
-
-
-DROP TABLE IF EXISTS SALUS_METRICS.SESSION_TIMESERIES;
-
-CREATE TABLE SALUS_METRICS.SESSION_TIMESERIES (
-    `api_key` LowCardinality (String) CODEC (ZSTD (1)),
-    `site` LowCardinality (String) CODEC (ZSTD (1)),
-    `ts_bin` DateTime CODEC (Delta (4), ZSTD (1)),
-    `num` UInt64 CODEC (ZSTD (1)),
-) ENGINE = SummingMergeTree
+)
 ORDER BY
-    (api_key, site, ts_bin);
+    (api_key, site, id);
 
 
-DROP TABLE IF EXISTS SALUS_METRICS.session_timeseries_mv;
+-- DROP TABLE IF EXISTS SALUS_METRICS.SESSION_TIMESERIES;
 
-CREATE MATERIALIZED VIEW SALUS_METRICS.session_timeseries_mv TO SALUS_METRICS.SESSION_TIMESERIES AS
-SELECT
-    api_key,
-    site,
-    toStartOfFiveMinutes (ts) as ts_bin,
-    count() as num
-FROM
-    SALUS_METRICS.SESSION_EVENT
-GROUP BY
-    api_key,
-    site,
-    ts_bin;
+-- CREATE TABLE SALUS_METRICS.SESSION_TIMESERIES (
+--     `api_key` LowCardinality (String) CODEC (ZSTD (1)),
+--     `site` LowCardinality (String) CODEC (ZSTD (1)),
+--     `ts_bin` DateTime CODEC (Delta (4), ZSTD (1)),
+--     `country_code` LowCardinality (String) CODEC (ZSTD (1)),
+--     `os` AggregateFunction(sumMap, Tuple(Array(String), Array(UInt64))),
+--     -- `browser` LowCardinality (String) CODEC (ZSTD (1)),
+--     -- `city` String CODEC (ZSTD (1)),
+--     `num` AggregateFunction(count, UInt64),
+--     `uniq_visitors` AggregateFunction(uniq, UUID)
+-- ) ENGINE = AggregatingMergeTree
+-- ORDER BY
+--     (api_key, site, ts_bin, country_code);
+
+
+-- DROP TABLE IF EXISTS SALUS_METRICS.session_timeseries_mv;
+
+-- CREATE MATERIALIZED VIEW SALUS_METRICS.session_timeseries_mv TO SALUS_METRICS.SESSION_TIMESERIES AS
+-- SELECT
+--     SALUS_METRICS.SESSION_EVENT.api_key AS api_key,
+--     SALUS_METRICS.SESSION_EVENT.site AS site,
+--     toStartOfHour(SALUS_METRICS.SESSION_EVENT.ts) as ts_bin,
+--     SALUS_METRICS.SESSION_EVENT.country_code AS country_code,
+--     sumMapState(tuple(array(SALUS_METRICS.SESSION_EVENT.os), array(toUInt64(1)))) AS os,
+--     sumMapState(tuple(array(SALUS_METRICS.SESSION_EVENT.browser), array(toUInt64(1)))) AS browser,
+--     -- SALUS_METRICS.SESSION_EVENT.city AS city,
+--     countState() as num,
+--     uniqState(SALUS_METRICS.SESSION_EVENT.parent) as uniq_visitors
+-- FROM
+--     SALUS_METRICS.SESSION_EVENT
+-- INNER JOIN SALUS_METRICS.VISITOR_EVENT
+--     ON (SALUS_METRICS.SESSION_EVENT.parent = SALUS_METRICS.VISITOR_EVENT.id
+--         AND SALUS_METRICS.SESSION_EVENT.api_key = SALUS_METRICS.VISITOR_EVENT.api_key
+--         AND SALUS_METRICS.SESSION_EVENT.site = SALUS_METRICS.VISITOR_EVENT.site)
+-- GROUP BY
+--     api_key,
+--     site,
+--     ts_bin,
+--     country_code
+--     ;

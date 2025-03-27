@@ -1,18 +1,43 @@
+DROP TABLE IF EXISTS SALUS_METRICS.iso_3166_country_codes;
+
+CREATE TABLE SALUS_METRICS.iso_3166_country_codes (
+    `name` Nullable(String),
+    `cca2` Nullable(String),
+    `cca3` Nullable(String),
+    `ccn` Nullable(String),
+    `iso_3166_2` Nullable(String),
+    `region` Nullable(String),
+    `sub_region` Nullable(String),
+    `intermediate_region` Nullable(String),
+    `region_code` Nullable(String),
+    `sub_region_code` Nullable(String),
+    `intermediate_region_code` Nullable(String)
+) engine = URL (
+    'https://raw.githubusercontent.com/lukes/ISO-3166-Countries-with-Regional-Codes/master/all/all.csv',
+    'CSV'
+);
+
+
+DROP TABLE IF EXISTS SALUS_METRICS.dbip_city_ipv4_url;
+
 create table SALUS_METRICS.dbip_city_ipv4_url (
     ip_range_start IPv4,
     ip_range_end IPv4,
-    country_code Nullable (String),
-    state1 Nullable (String),
-    state2 Nullable (String),
-    city Nullable (String),
-    postcode Nullable (String),
+    country_code Nullable(String),
+    state1 Nullable(String),
+    state2 Nullable(String),
+    city Nullable(String),
+    postcode Nullable(String),
     latitude Float64,
     longitude Float64,
-    timezone Nullable (String)
+    timezone Nullable(String)
 ) engine = URL (
     'https://raw.githubusercontent.com/sapics/ip-location-db/master/dbip-city/dbip-city-ipv4.csv.gz',
     'CSV'
 );
+
+DROP DICTIONARY IF EXISTS SALUS_METRICS.dbip_city_ipv4_trie;
+DROP TABLE IF EXISTS SALUS_METRICS.dbip_city_ipv4;
 
 create table SALUS_METRICS.dbip_city_ipv4 (
    cidr String,
@@ -36,11 +61,13 @@ select
     concat(toString(cidr_address),'/',toString(cidr_suffix)) as cidr,
     latitude,
     longitude,
-    coalesce(country_code, '') as country_code,
+    coalesce(SALUS_METRICS.iso_3166_country_codes.cca3, '') as country_code,
     coalesce(state1, '') as state,
     coalesce(city, '') as city
 from
-    SALUS_METRICS.dbip_city_ipv4_url;
+    SALUS_METRICS.dbip_city_ipv4_url
+left outer join SALUS_METRICS.iso_3166_country_codes
+    on (SALUS_METRICS.dbip_city_ipv4_url.country_code = SALUS_METRICS.iso_3166_country_codes.cca2);
 
 create dictionary dbip_city_ipv4_trie (
     cidr String,
