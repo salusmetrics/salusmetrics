@@ -12,23 +12,23 @@ license = "AGPL-3.0"
 [workspace.dependencies]
 ingest = { path = "src/ingest" }
 conf = { path = "src/conf" }
-axum = "0.8.1"
+axum = "0.8.4"
 axum-client-ip = "0.7.0"
-clickhouse = { version = "0.13.1", features = ["test-util", "time", "uuid"] }
-config = { version = "0.15.7", features = ["toml"] }
-http = "1.2.0"
+clickhouse = { version = "0.13.2", features = ["test-util", "time", "uuid"] }
+config = { version = "0.15.11", features = ["toml"] }
+http = "1.3.1"
 hyper = "1.6.0"
-serde = { version = "1.0.217", features = ["derive"] }
-serde_repr = "0.1.19"
-thiserror = "2.0.11"
-time = "0.3.37"
-tokio = { version = "1.43.0", features = [
+serde = { version = "1.0.219", features = ["derive"] }
+serde_repr = "0.1.20"
+thiserror = "2.0.12"
+time = "0.3.41"
+tokio = { version = "1.45.0", features = [
     "rt-multi-thread",
     "signal",
     "tracing",
 ] }
 tower = "0.5.2"
-tower-http = { version = "0.6.2", features = [
+tower-http = { version = "0.6.4", features = [
     "compression-deflate",
     "compression-gzip",
     "cors",
@@ -41,4 +41,4 @@ tracing-subscriber = { version = "0.3.19", features = [
     "json",
     "tracing-log",
 ] }
-uuid = { version = "1.12.1", features = ["v7"] }
+uuid = { version = "1.16.0", features = ["v7"] }
