@@ -1,5 +1,5 @@
 use axum::{Json, extract::State};
-use axum_client_ip::InsecureClientIp;
+use axum_client_ip::ClientIp;
 use tracing::instrument;
 
 use crate::{
@@ -22,7 +22,7 @@ use crate::{
 pub async fn save_client_events<I: IngestEventService + std::fmt::Debug>(
     State(state): State<IngestApplicationState<I>>,
     client_request_headers: ClientEventRequestHeaders,
-    client_ip: InsecureClientIp,
+    client_ip: ClientIp,
     Json(event_bodies): Json<Vec<ClientEventRequestBody>>,
 ) -> Result<ClientEventActionSummary, ClientEventRequestError> {
     let requests: Vec<ClientEventRequest> = event_bodies
@@ -71,7 +71,7 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_save_client_events() {
         let uuid_now = Uuid::now_v7();
-        let test_client_ip = InsecureClientIp(IpAddr::V4(Ipv4Addr::LOCALHOST));
+        let test_client_ip = ClientIp(IpAddr::V4(Ipv4Addr::LOCALHOST));
 
         // Valid success case with non-empty request
         let mock_success_repo = MockIngestEventRepository {

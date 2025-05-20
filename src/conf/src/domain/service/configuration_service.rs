@@ -1,5 +1,6 @@
 use std::net::SocketAddr;
 
+use axum_client_ip::ClientIpSource;
 use clickhouse::Client;
 use thiserror::Error;
 use tower_http::{compression::CompressionLayer, cors::CorsLayer, timeout::TimeoutLayer};
@@ -33,6 +34,11 @@ pub trait ConfigurationService: 'static + Send + Sync {
     /// `try_cors_layer` attempts to create and return
     /// `tower_http::cors::CorsLayer`
     fn try_cors_layer(&self) -> Result<CorsLayer, ConfigurationServiceError>;
+
+    /// `try_ip_source attempts to create and return a
+    /// `axum_client_ip::ClientIpSource` value that can be used to add an
+    /// extension to axum for determining the IP of a connecting http client
+    fn try_ip_source(&self) -> Result<ClientIpSource, ConfigurationServiceError>;
 
     /// `try_timeout_layer` attempts to create and return a
     /// `tower_http::timeout::TimeoutLayer`

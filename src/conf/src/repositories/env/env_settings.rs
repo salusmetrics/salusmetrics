@@ -1,10 +1,12 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 
+use axum_client_ip::ClientIpSource;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::model::{
-    compression::CompressionSettings, cors::CorsSettings, listener::ListenerSettings,
-    metrics_db::MetricsDatabaseSettings, timeout::TimeoutSettings, tracing::TracingSettings,
+    compression::CompressionSettings, cors::CorsSettings, ip_source::IpSourceSettings,
+    listener::ListenerSettings, metrics_db::MetricsDatabaseSettings, timeout::TimeoutSettings,
+    tracing::TracingSettings,
 };
 
 /// `EnvCompressionSettings` allows the setup of `tower-http` `CompressionLayer`
@@ -83,6 +85,22 @@ pub struct EnvMetricsDatabaseSettings {
 impl From<&EnvMetricsDatabaseSettings> for MetricsDatabaseSettings {
     fn from(value: &EnvMetricsDatabaseSettings) -> Self {
         Self::new(&value.url, &value.database, &value.user, &value.pass)
+    }
+}
+
+/// `IpSettings` allows the user to set up how the sytems will determine
+/// the remote HTTP client IP address. This can be from the network layer,
+/// or via headers that are added by proxy tiers.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct EnvIpSettings {
+    source: ClientIpSource,
+}
+
+impl From<&EnvIpSettings> for IpSourceSettings {
+    fn from(value: &EnvIpSettings) -> Self {
+        Self {
+            variant: value.source.to_owned(),
+        }
     }
 }
 

@@ -2,8 +2,8 @@ use thiserror::Error;
 
 use crate::domain::model::{
     compression::CompressionSettings, configuration_error::ConfigurationError, cors::CorsSettings,
-    listener::ListenerSettings, metrics_db::MetricsDatabaseSettings, timeout::TimeoutSettings,
-    tracing::TracingSettings,
+    ip_source::IpSourceSettings, listener::ListenerSettings, metrics_db::MetricsDatabaseSettings,
+    timeout::TimeoutSettings, tracing::TracingSettings,
 };
 
 /// `ConfigurationRepositoryError` represents the domain errors that can arise
@@ -35,6 +35,9 @@ pub trait ConfigurationRepository: 'static + Clone + Send + Sync {
     /// `try_cors_settings` attempts to fetch `CorsSettings`
     fn try_cors_settings(&self) -> Result<CorsSettings, ConfigurationRepositoryError>;
 
+    /// `try_ip_source_settings` attempts to fetch `IpSourceSettings`
+    fn try_ip_source_settings(&self) -> Result<IpSourceSettings, ConfigurationRepositoryError>;
+
     /// `try_timeout_settings` attempts to fetch `TimeoutSettings`
     fn try_timeout_settings(&self) -> Result<TimeoutSettings, ConfigurationRepositoryError>;
 
@@ -60,6 +63,7 @@ pub(crate) mod tests {
     pub(crate) struct MockConfigurationRepository {
         compression_result: Option<Result<CompressionSettings, ConfigurationRepositoryError>>,
         cors_result: Option<Result<CorsSettings, ConfigurationRepositoryError>>,
+        ip_source_result: Option<Result<IpSourceSettings, ConfigurationRepositoryError>>,
         listener_result: Option<Result<ListenerSettings, ConfigurationRepositoryError>>,
         metrics_db_result: Option<Result<MetricsDatabaseSettings, ConfigurationRepositoryError>>,
         timeout_result: Option<Result<TimeoutSettings, ConfigurationRepositoryError>>,
@@ -79,6 +83,13 @@ pub(crate) mod tests {
             cors: Result<CorsSettings, ConfigurationRepositoryError>,
         ) {
             self.cors_result = Some(cors)
+        }
+
+        pub(crate) fn set_ip_source_result(
+            &mut self,
+            ip_source: Result<IpSourceSettings, ConfigurationRepositoryError>,
+        ) {
+            self.ip_source_result = Some(ip_source)
         }
 
         pub(crate) fn set_listener_result(
@@ -121,6 +132,10 @@ pub(crate) mod tests {
             self.cors_result.to_owned().unwrap()
         }
 
+        fn try_ip_source_settings(&self) -> Result<IpSourceSettings, ConfigurationRepositoryError> {
+            self.ip_source_result.to_owned().unwrap()
+        }
+
         fn try_listener_settings(&self) -> Result<ListenerSettings, ConfigurationRepositoryError> {
             self.listener_result.to_owned().unwrap()
         }
@@ -153,6 +168,7 @@ pub(crate) mod tests {
             max_age_secs: Some(10),
             origins: vec!["test.com".to_owned()],
         }));
+        repo.set_ip_source_result(Ok(IpSourceSettings::default()));
         repo.set_listener_result(Ok(ListenerSettings {
             port: 9000,
             ipv4: Some(Ipv4Addr::LOCALHOST),
@@ -178,6 +194,11 @@ pub(crate) mod tests {
         assert!(
             repo.try_cors_settings().is_ok(),
             "Expected result for CORS settings"
+        );
+
+        assert!(
+            repo.try_ip_source_settings().is_ok(),
+            "Expected result for ip source settings"
         );
 
         assert!(

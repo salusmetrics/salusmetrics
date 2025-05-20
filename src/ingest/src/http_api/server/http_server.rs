@@ -37,6 +37,7 @@ where
             .try_cors_layer()?
             .allow_methods([Method::POST])
             .allow_headers(Any);
+        let ip_source = self.conf_service.try_ip_source()?;
         let timeout_layer = self.conf_service.try_timeout_layer()?;
 
         let ingest_repository = ClickhouseIngestRepository::try_new(metrics_client).await?;
@@ -51,6 +52,7 @@ where
             .layer(compression_layer)
             .layer(cors_layer)
             .layer(timeout_layer)
+            .layer(ip_source.into_extension())
             .with_state(state);
 
         let listener_socket_addr = self.conf_service.try_listener_socket_addr()?;

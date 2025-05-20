@@ -43,6 +43,15 @@ where
     }
 
     #[instrument]
+    fn try_ip_source(&self) -> Result<axum_client_ip::ClientIpSource, ConfigurationServiceError> {
+        Ok((&self
+            .conf_repository
+            .try_ip_source_settings()
+            .map_err(map_repo_err_to_service_err)?)
+            .into())
+    }
+
+    #[instrument]
     fn try_listener_socket_addr(&self) -> Result<std::net::SocketAddr, ConfigurationServiceError> {
         (&self
             .conf_repository
@@ -125,6 +134,7 @@ mod tests {
     use super::*;
     use crate::domain::model::compression::CompressionSettings;
     use crate::domain::model::cors::CorsSettings;
+    use crate::domain::model::ip_source::IpSourceSettings;
     use crate::domain::model::listener::ListenerSettings;
     use crate::domain::model::metrics_db::MetricsDatabaseSettings;
     use crate::domain::model::timeout::TimeoutSettings;
@@ -142,6 +152,7 @@ mod tests {
             max_age_secs: Some(20),
             origins: vec!["test.com".to_owned()],
         }));
+        test_success_repo.set_ip_source_result(Ok(IpSourceSettings::default()));
         test_success_repo.set_listener_result(Ok(ListenerSettings {
             port: 8444,
             ipv4: Some(Ipv4Addr::LOCALHOST),
@@ -167,6 +178,11 @@ mod tests {
         assert!(
             test_success_service.try_cors_layer().is_ok(),
             "Expected to create valid CORS layer"
+        );
+
+        assert!(
+            test_success_service.try_ip_source().is_ok(),
+            "Expected a valid ClientIpSource"
         );
 
         assert!(

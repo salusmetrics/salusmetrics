@@ -8,7 +8,7 @@ use crate::domain::repository::configuration_repository::{
 
 use super::env_settings::*;
 use crate::domain::model::{
-    compression::*, cors::*, listener::*, metrics_db::*, timeout::*, tracing::*,
+    compression::*, cors::*, ip_source::*, listener::*, metrics_db::*, timeout::*, tracing::*,
 };
 
 /// `EnvRepository` provides a `ConfigurationRepository` based on the
@@ -19,15 +19,17 @@ use crate::domain::model::{
 /// graph of names is similarly separated by`_`.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct EnvRepository {
+    ip: Option<EnvIpSettings>,
     layer: Option<EnvLayerSettings>,
     listener: Option<EnvListenerSettings>,
     metricsdb: Option<EnvMetricsDatabaseSettings>,
     tracing: Option<EnvTracingSettings>,
 }
 
-/// `LayerSettings` wraps the `CorsSettings` and `TimeoutSettings` into a
-/// common struct which can be used to handle both in a clean manner
-/// which will optionally set up a CORS layer if any is specified.
+/// `LayerSettings` wraps the `CorsSettings`, `CompressionSettings`
+/// and `TimeoutSettings` into a common struct which can be used to handle all
+/// in a clean manner which will optionally set up a CORS layer if any is
+/// specified.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct EnvLayerSettings {
     compression: Option<EnvCompressionSettings>,
@@ -89,6 +91,16 @@ impl ConfigurationRepository for EnvRepository {
     }
 
     #[instrument]
+    fn try_ip_source_settings(&self) -> Result<IpSourceSettings, ConfigurationRepositoryError> {
+        let Some(ref ip_settings) = self.ip else {
+            tracing::info!("Using default IP Source Settings");
+            return Ok(IpSourceSettings::default());
+        };
+        tracing::info!("IP Source Determination Method: {ip_settings:?}");
+        Ok(ip_settings.into())
+    }
+
+    #[instrument]
     fn try_listener_settings(&self) -> Result<ListenerSettings, ConfigurationRepositoryError> {
         let Some(ref listener_settings) = self.listener else {
             tracing::error!("Missing listener configuration in ENV");
@@ -143,6 +155,7 @@ mod tests {
     use super::*;
 
     const VALID_SETTINGS_ARR: &[(&str, &str, &str)] = &[
+        ("IP", "SOURCE", "CfConnectingIp"),
         ("LAYER", "COMPRESSION_DEFLATE", "false"),
         ("LAYER", "COMPRESSION_GZIP", "true"),
         (
@@ -169,6 +182,11 @@ mod tests {
         // Test compression
         if repo.try_compression_settings().is_err() {
             panic!("Expected compression layer to be created");
+        }
+
+        // Test IP Source
+        if repo.try_ip_source_settings().is_err() {
+            panic!("Expected valid ip source to be created");
         }
 
         // Test timeout
