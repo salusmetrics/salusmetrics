@@ -157,7 +157,7 @@ mod tests {
         );
 
         if ClientEventRequestHeaders::try_from(&valid_headers).is_err() {
-            println!("headers: {:?}", valid_headers);
+            println!("headers: {valid_headers:?}");
             panic!("Expected valid ClientEventRequestHeaders for valid HeaderMap");
         }
 

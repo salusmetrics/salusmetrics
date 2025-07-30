@@ -247,7 +247,7 @@ mod tests {
     fn setup_valid_test_env() -> String {
         let app_name = Uuid::now_v7().to_string();
         for (pre, post, val) in VALID_SETTINGS_ARR {
-            let key = format!("{}_{}_{}", app_name, pre, post);
+            let key = format!("{app_name}_{pre}_{post}");
             // TODO: Audit that the environment access only happens in single-threaded code.
             unsafe { set_var(&key, val) };
             println!("{} = {}", &key, val);
@@ -259,7 +259,7 @@ mod tests {
     fn cleanup_test_env(app_name: &str) {
         for (pre, post, _) in VALID_SETTINGS_ARR {
             // TODO: Audit that the environment access only happens in single-threaded code.
-            unsafe { remove_var(format!("{}_{}_{}", app_name, pre, post)) };
+            unsafe { remove_var(format!("{app_name}_{pre}_{post}")) };
         }
     }
 }
