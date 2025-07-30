@@ -12,7 +12,7 @@ data that is protected by HIPAA and similar laws.
 
 That's where tools like Salus Metrics Come in.
 
-# Cost Effective In-House Analytics
+### Cost Effective In-House Analytics
 
 Salus Metrics aims to provide the lowest cost to capture and report on web and
 app analytics in an in-house package. There are three main strategies for
@@ -31,7 +31,7 @@ minimizing costs:
   consistent memory and CPU performance allows straightforward scaling as traffic
   goes up or down.
 
-# Running Salus Metrics Ingest
+### Running Salus Metrics Ingest
 
 The Salus Metrics ingest server requires that a ClickHouse database with the
 appropriate schema has already been deployed. Schema can be found in
@@ -71,3 +71,37 @@ using cargo, you will need to specify it by name as follows:
 ```sh
 cargo run --bin ingest_server
 ```
+
+### Event Model
+
+Events in Salus Metrics are modeled after tracing events with a concept of
+hierarchical inheritance. At the root are `Visitor` events which can have
+multiple `Session` children. Each `Session` can then have multiple `Section`
+children. Below this there could be more levels, such as `Click` events as well.
+This allows the system to minimize storage overhead while also providing
+in-depth information on product usage.
+
+Each event type has it's own schema that is enforced by the system. An essential
+aspect of that schema is that each event has a distinct ID that must be a UUIDv7
+with the datetime portion of the UUID representing the event's timestamp. The
+server will reject events that fall outside of a specific time range from now
+(one hour prior and 5 minutes after now).
+
+Both the ingest server's exposed API and the database schema for initial
+ingestion attempt to represent all events generically by directly exposing
+fields that are common to all event types and placing all other fields in an
+array of key/value pairs. In each case (server and DB logic), the type-specific
+fields are then examined for correctness and translated into the appropriate
+representation. In the case of the ClickHouse side this is done using a NULL
+engine type for `EVENT` combined with materialized views which take this data
+and create records for `VISITOR_EVENT`, `SESSION_EVENT`, etc. Each of these
+materialized event tables is then also the source for materialized views that
+aggregate data for analysis.
+
+### Reporting
+
+Salus metrics relies on using Apache Superset or other tools on top of
+ClickHouse to provide reporting. This is done to provide best-in-class tooling
+and also to allow ingest and reporting to scale independently. As v5 of Superset
+was just recently released the configuration for Superset is not included here
+at the moment until it can all be updated.
