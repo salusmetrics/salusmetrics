@@ -44,9 +44,9 @@ mod tests {
             variant: ClientIpSource::CfConnectingIp,
         };
         let _ = ClientIpSource::from(&cf_connecting).into_extension();
-        // RightmostForwarded
+        // RightmostXForwardedFor
         let rightmost = IpSourceSettings {
-            variant: ClientIpSource::RightmostForwarded,
+            variant: ClientIpSource::RightmostXForwardedFor,
         };
         let _ = ClientIpSource::from(&rightmost).into_extension();
     }
